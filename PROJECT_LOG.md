@@ -225,10 +225,268 @@ rather than something reconstructed after the fact.
 | Merry Chris | Merry, Joy Chris | 2 |
 | Andrea Dela Cruz | Andrea Dela Cruz (solo) | 1 |
 
-**Still placeholder / not yet built (per the original phased plan):**
+## 10. Confirmed: one-person-one-toggle model, plus surname-matching rules
+
+Following up on step 9's questions, you confirmed the new data model and answered
+each open point:
+
+- **Party/seats model is being torn out.** The prototype moves to the spec's
+  one row = one person = one toggle. No more "search a surname → see a household
+  → toggle each member" screen.
+- **Sibling/shared-surname handling:** if two guests share a surname *and* are
+  actually part of the same household, the intended workflow is that one sibling
+  can prompt/ask the other whether they're joining — i.e. the site should make it
+  easy to check both without automatically bundling them as one invitation. If the
+  shared surname is coincidental (unrelated guests), the site should still show the
+  most accurate match to what was typed first, with a separate dropdown/option to
+  reveal other guests who share that surname, rather than merging them.
+- **Suffix-aware surname matching:** requested that surname matching recognize and
+  ignore common name suffixes (Jr., Sr., I, II, III, IV, etc.) so that, e.g.,
+  "Brandon Marson Jr." is matched/grouped on the surname "Marson," not on "Jr."
+  You confirmed guest names themselves won't have duplicate collisions to worry
+  about beyond this.
+- **Re-visiting after responding:** guests are allowed to search again and
+  resubmit/change their RSVP after already responding — no read-only lock.
+- **Test data:** switching mock data to match the ChatGPT-provided Sheet sample —
+  G001 Kimi Czar, G002 Merry Chris, G003 Marilyn Santos — replacing the old
+  family-grouped mock data (Czar family of 4, Chris pair, Andrea Dela Cruz solo).
+- **Sequencing:** reshape the frontend to the new one-person model first; the
+  actual Google Apps Script (`Code.gs`) + Google Sheet setup walkthrough comes
+  after, as a separate step-by-step pass (you'll be entering the Sheet manually,
+  so that explanation needs to be step-by-step rather than just code).
+- **Toggle wording & default:** keep "Joyfully accepts / Regretfully declines" as
+  the single-person toggle labels, but the default state is now **declined**
+  (matches the Sheet's `Pending` default being closer in spirit to "not yet
+  confirmed attending" than to a household defaulting everyone to yes).
+- **Confirmation screen changed:** on submitting, thank the guest specifically
+  when they've accepted; the full members/summary list that used to show under
+  the thank-you screen is being removed, since there's no household list to
+  summarize anymore.
+
+This is a frontend reshape pass (data model, search/matching logic, single-toggle
+UI, confirm screen) — the Google Sheets + Apps Script step-by-step setup is queued
+as the next step after this one, not done yet.
+
+---
+
+## 11. Frontend reshaped to one-person-one-toggle
+
+Implemented the decisions from step 10.
+
+**`script.js`:**
+- `GUEST_LIST` replaced with the one-row-per-person shape: `G001 Kimi Czar`,
+  `G002 Merry Chris`, `G003 Marilyn Santos`, each with `status` ("Pending" by
+  default, matching the Sheet) and `responseTime`. The old party/`seats`/`members`
+  shape is gone.
+- Added `parseName()`, which splits a full name into first/last/suffix and
+  recognizes Jr., Sr., and roman numerals I–VIII as non-surname suffixes (checked
+  case-insensitively, with or without a trailing period) — so "Brandon Marson Jr."
+  is matched on "Marson," not "Jr."
+- `findGuest()` now returns the single best match for what was typed (exact name
+  match preferred, otherwise a "name contains query" match) **plus**, separately,
+  any other guests who share that match's surname (via `parseName`). The shared-
+  surname guests are never merged into the result — they're only surfaced through
+  the dropdown described below.
+- Toggle now defaults to **declined** unless that guest's stored status is already
+  "Attending" (so resubmitting/re-searching shows their last answer rather than
+  always resetting).
+- `submitRSVP()` now writes a single guest's status + timestamp (mocked locally),
+  matching the eventual `Pending → Attending/Declined` Apps Script behavior.
+
+**`index.html` / `styles.css`:**
+- Removed the seat-count block and the multi-member toggle list.
+- Added a single "Reserved in your honour" block showing just the matched guest's
+  name and one toggle switch.
+- Added a collapsible **"Others named [Surname]"** dropdown that appears above the
+  invite block whenever other guests share the matched person's surname. It's
+  collapsed by default; opening it lists the other guest(s) as tappable buttons
+  that re-run the search as that person — this covers both a sibling checking on
+  a sibling and two unrelated guests who happen to share a surname, without ever
+  auto-bundling them into one invitation.
+- Thank-you screen no longer shows a members summary list (nothing to summarize
+  with one person per invitation). The thank-you message itself now differs by
+  response: an "overjoyed you'll be celebrating with us" message when accepted,
+  versus a quieter "sorry you can't make it, thank you for letting us know" when
+  declined.
+- Re-searching a name that already responded is still fully allowed (no read-only
+  lock), and now reflects their last saved answer in the toggle position.
+
+**Not done in this pass (queued next, per your sequencing preference):** the actual
+Google Sheets column setup + Apps Script (`Code.gs`) walkthrough. `findGuest()` and
+`submitRSVP()` remain isolated mock functions ready to be swapped for real
+`fetch()` calls to an Apps Script Web App endpoint.
+
+---
+
+## 12. Google Sheets + Apps Script backend built
+
+Implemented the actual backend from the spec in step 9, on top of the reshaped
+frontend from step 11.
+
+**New file — `Code.gs`** (Google Apps Script, bound to the guest-list Sheet):
+- `doGet(e)` handles two actions via query string, both plain GET so the browser
+  never hits a CORS preflight (Apps Script Web Apps don't handle `OPTIONS`
+  requests, which breaks `POST`+JSON fetches from another origin):
+  - `?action=list` — reads every row after the header and returns
+    `{ ok, guests: [{ id, name, status }] }`. The `Note` column is deliberately
+    left out of the response since it's manual-only and never shown on the site.
+  - `?action=rsvp&id=...&status=...` — finds the row with that Guest ID, sets the
+    `RSVP` column to `Attending` or `Declined`, and stamps `Response Time` with
+    the current date/time. `Note` is never touched.
+- `SHEET_NAME` constant at the top (`"Guests"`) — must match the actual tab name
+  in the Sheet, changeable in one place if the tab is named differently.
+
+**`script.js` changes:**
+- `GUEST_LIST` is now `let`, not `const`, and starts as the same local mock data
+  as before (Kimi Czar / Merry Chris / Marilyn Santos, all "Pending").
+- Added `APPS_SCRIPT_URL` — left blank on purpose. While it's blank, the site
+  behaves exactly as it did in step 11 (mock data, console-logged RSVPs). Once
+  the deployed Web App URL is pasted in, `loadGuestList()` fetches the real
+  guest list from the Sheet on page load, and `submitRSVP()` writes real
+  responses back to it — the search/matching/suffix/similar-surname logic from
+  step 11 didn't need to change at all, since it just operates on whatever's in
+  `GUEST_LIST`.
+- Both the fetch calls fail gracefully (falls back to mock behavior / logs a
+  warning) if the Sheet can't be reached, so a typo'd or not-yet-deployed URL
+  won't break the page.
+
+**Manual setup still needed on your end** (walked through step by step in the
+chat reply for this step, not repeated here since it involves clicking through
+the Google Sheets and Apps Script UI): create the Sheet with the `Guest ID |
+Guest Name | RSVP | Response Time | Note` header row and the three guest rows,
+paste `Code.gs` into the Sheet's Apps Script editor, deploy it as a Web App
+(`Execute as: Me`, `Who has access: Anyone`), then paste the resulting URL into
+`APPS_SCRIPT_URL` in `script.js`.
+
+---
+
+## 13. Invite row redesigned: name/toggle side-by-side, inline family expansion
+
+You shared a screenshot of the single-person invite block and asked for two
+changes: lay the matched guest's name and toggle out horizontally (name left,
+toggle right) instead of stacked/centered, and replace the old "Others named
+X" dropdown — which used to swap the search to a different person entirely —
+with one that expands *underneath* the matched guest's row and reveals each
+same-surname guest as their own name+toggle row, so a family or group of
+relatives arriving together can all be marked in one search instead of
+re-searching each name one at a time.
+
+Before implementing, I asked three clarifying questions since this changes the
+submission model from "one guest per Confirm" to "however many rows are in
+play per Confirm":
+
+1. **Confirm scope** — does Confirm submit RSVPs for everyone currently shown
+   (main + any expanded relatives), or only rows the guest actually touched?
+   → **Only rows they interacted with.** Simply expanding the dropdown to look
+   doesn't opt anyone in; a relative's row only joins the submission once its
+   toggle is actually switched.
+2. **Thank-you screen with multiple people** — list each person's response, or
+   one generic group message? → **List each person briefly, comma-separated**
+   (e.g. "Kimi Czar accepts, Jermon Czar II declines.").
+3. **How the expanded rows reveal** — all at once as toggles, or a checklist
+   first? → **Show as toggles right away**, with a "Show all" / "Show first 10"
+   choice if the same-surname list is long; picking "first 10" re-offers the
+   same choice for whatever's left, repeating until everything's shown. If
+   what's left after any batch is 10 or fewer, only "Show all" is offered
+   (a "first 10" choice would be identical to it at that point).
+
+**`index.html` / `styles.css`:**
+- Replaced the centered, stacked name/toggle invite block with a horizontal
+  `.person-row` (name left, switch + accept/decline label right) — this same
+  row style is reused for every relative row that gets revealed underneath.
+- The "Others named [Surname]" chevron now lives inside the invite block,
+  directly under the main guest's row, and expands an inline
+  `#similarRows` container in place rather than a separate section that used
+  to replace the search.
+
+**`script.js`:**
+- `findGuest()`'s return shape is unchanged (still `{ match, similar }`), but
+  the similar list is no longer a set of clickable "switch to this person"
+  buttons — it's rendered as real toggle rows via a new `buildPersonRow()`
+  helper, shared between the main row and every relative row.
+- Added `touchedIds` (a `Set`) that only gets a guest's id added to it when
+  their row's toggle actually fires a `change` event — this is what Confirm
+  reads to decide who besides the main guest gets submitted.
+- Added pagination state (`revealedCount`) so opening the dropdown for a long
+  same-surname list shows the "Show all" / "Show 10 more" choice described
+  above, re-offering it after each batch until everyone's visible; a single
+  "Show all" button appears once ≤10 remain.
+- `submitRSVP()` now runs once per submitted person (main + touched
+  relatives), and the thank-you screen (`renderThankYou()`) branches: a single
+  submission keeps the old personalized accept/decline message, multiple
+  submissions get the new comma-separated "Name accepts/declines" summary.
+
+---
+
+## 14. Thank-you screen became a popup modal; reveal batch size 10 → 5
+
+You shared a reference screenshot of a dark, card-style "Thank You" popup (couple
+name, divider, thank-you message, Close button) and asked for that instead of the
+inline thank-you panel that used to reveal at the bottom of the RSVP card. (The
+screenshot also had an unrelated "Get yours today, PM to purchase" sticker across
+it — that's a marketplace watermark on the template it came from, not part of the
+design, so it wasn't carried over.)
+
+**Changes made:**
+- Thank-you content moved out of the RSVP card entirely into `#thankYouOverlay`, a
+  fixed full-screen modal that's hidden until Confirm is pressed. Styled to match
+  the site's existing navy/brass palette rather than the reference's green, since
+  it's replacing the popup *mechanism*, not the color scheme: couple name in script
+  type, a divider, "THANK YOU" in spaced caps, the response message, and a Close
+  button that dismisses the modal.
+- The old "Find another invitation" ghost button is gone along with the inline
+  panel — Close just dismisses the popup; the guest can still edit the name field
+  underneath to look up someone else.
+- Kept the accept/decline-aware messaging from step 13 rather than dropping it for
+  the reference's generic wording: single-person responses still read personally,
+  multi-person responses still list each name with accept/decline, comma-separated,
+  now followed by one shared closing line (celebratory if everyone accepted, a
+  softer line if everyone declined, a neutral one if mixed).
+- **Reveal batch size changed from 10 to 5** throughout: the "Others named
+  [Surname]" dropdown now offers "Show all" / "Show 5 more" (previously 10), and
+  only offers "Show 5 more" as a distinct choice when more than 5 people remain.
+
+**Also did a general cleanup pass on `script.js`** per your request:
+- Removed unused per-guest `responseTime` tracking on the client — it was never
+  read anywhere in the UI; the Sheet already stamps Response Time server-side via
+  `Code.gs`, so tracking it twice was dead weight.
+- Condensed `parseName`/`surnameOf`/`firstNameOf`/`titleCase` and `buildPersonRow`
+  into shorter, more direct implementations (arrow functions and template-literal
+  markup where that didn't hurt readability), grouped all DOM element lookups
+  together near the top instead of scattered near their first use, and removed
+  the now-unused `.btn-ghost` / `.summary-list` CSS rules left over from the old
+  inline thank-you panel.
+- Behavior is otherwise unchanged from step 13 (touched-only submission, suffix-
+  aware surname matching, etc.) — this was a structure/readability pass, not a
+  logic change beyond the modal switch and the 10→5 batch size.
+
+---
+
+## 15. Live Apps Script URL connected
+
+You shared your deployed Apps Script Web App URL and asked not to have to paste it
+in each time. `APPS_SCRIPT_URL` in `script.js` is now set to it directly, so the
+site fetches the real guest list from the Sheet and writes real RSVPs to it by
+default — the mock `GUEST_LIST` still sits in the file as an automatic fallback if
+the Sheet is ever unreachable, but no manual step is needed anymore.
+
+---
+
+## 16. Thank-you message simplified — no more per-person listing
+
+Corrected step 14: "copy the thank-you box" meant match the reference message
+itself, not keep listing every person's individual response. `showThankYou()` now
+always shows "Your response has been received." followed by one closing line
+("We can't wait to celebrate with you!" unless everyone in that submission
+declined, in which case "We'll miss you, but thank you for letting us know.") —
+no names, no accept/decline enumeration, regardless of how many people (main
+guest + any touched relatives) were part of that Confirm.
+
+---
+
+## Still placeholder / not yet built (per the original phased plan)
 - Real couple photos (three blank photo slots waiting for images)
 - Real venue name, date confirmation, and map link
-- Google Sheets + Apps Script backend (Phase 3–4 from the original brief) —
-  `findGuest()` and `submitRSVP()` in `script.js` are written so they can be swapped
-  for real API calls without touching the rest of the code
+- Google Sheets + Apps Script backend walkthrough (queued as the next step —
+  see step 10 above)
 - Gallery, countdown, and other "final website" sections (Phase 5)

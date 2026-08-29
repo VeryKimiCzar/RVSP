@@ -185,22 +185,35 @@
             <input type="text" id="nameInput" placeholder="Enter your name…" autocomplete="off">
             <p class="lookup-status" id="lookupStatus" aria-live="polite"></p>
 
-            <div class="reveal-section" id="seatsSection">
+            <!-- The matched guest's row (name left, toggle right). If other
+                 invited guests share their surname, a chevron beneath this
+                 row expands to reveal each of them as their own toggle row,
+                 in place — no re-searching needed for a family arriving
+                 together. Only rows the guest actually toggles get submitted
+                 alongside the main match. -->
+            <div class="reveal-section" id="inviteSection">
               <div class="reveal-inner">
-                <div class="seats-block">
+                <div class="invite-block">
                   <p class="field-label centered">Reserved in your honour</p>
-                  <p class="seat-number" id="seatNumber">0</p>
-                  <p class="seat-caption" id="seatCaption">guests included in the invitation</p>
-                </div>
-              </div>
-            </div>
 
-            <div class="reveal-section" id="attendanceSection">
-              <div class="reveal-inner">
-                <div class="attendance-block">
-                  <p class="field-label">Confirm attendance</p>
-                  <p class="attendance-hint">Toggle each name below to mark who will be attending.</p>
-                  <ul class="member-list" id="memberList"></ul>
+                  <div class="person-row person-row-main" id="mainPersonRow">
+                    <span class="person-name" id="inviteName">Guest Name</span>
+                    <div class="member-control">
+                      <label class="switch">
+                        <input type="checkbox" id="attendToggle" aria-label="Attending">
+                        <span class="track"></span>
+                        <span class="thumb"></span>
+                      </label>
+                      <span class="switch-label" id="attendLabel">Regretfully declines</span>
+                    </div>
+                  </div>
+
+                  <button class="similar-toggle" id="similarToggle" type="button" aria-expanded="false" hidden>
+                    <span id="similarToggleLabel">Others named <span id="similarSurname"></span></span>
+                    <svg class="similar-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+
+                  <div class="similar-rows" id="similarRows"></div>
                 </div>
               </div>
             </div>
@@ -214,25 +227,25 @@
               </div>
             </div>
 
-            <div class="reveal-section" id="thankYouSection">
-              <div class="reveal-inner">
-                <div class="thankyou-block">
-                  <p class="headline" id="thankYouName">Thank you!</p>
-                  <p class="sub">We look forward to celebrating with you.
-                <svg class="heart-icon" viewBox="0 0 24 24" width="14" height="14" fill="#2c4a78" aria-hidden="true"><path d="M12 21s-7.5-4.6-10-9.3C.5 8.4 2.2 5 5.6 5c2 0 3.4 1 4.4 2.5C11 6 12.4 5 14.4 5c3.4 0 5.1 3.4 3.6 6.7C19.5 16.4 12 21 12 21z"/></svg>
-              </p>
-                  <ul class="summary-list" id="summaryList"></ul>
-                  <button class="btn btn-ghost" id="newSearchBtn">Find another invitation</button>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
     </section>
 
   </main>
+
+  <!-- Thank-you modal: pops up over the page after Confirm response,
+       instead of revealing inline in the RSVP card. -->
+  <div class="thankyou-overlay" id="thankYouOverlay">
+    <div class="thankyou-modal" role="dialog" aria-modal="true" aria-labelledby="thankYouHeading">
+      <span class="modal-spark" aria-hidden="true">&#10022;</span>
+      <p class="modal-couple">Arvin <span class="amp">&amp;</span> Precious</p>
+      <hr class="modal-divider">
+      <p class="modal-heading" id="thankYouHeading">Thank You</p>
+      <p class="modal-message" id="thankYouMessage">Your response has been received.</p>
+      <button class="btn-modal-close" id="closeThankYouBtn">Close</button>
+    </div>
+  </div>
 
 <script src="script.js"></script>
 </body>

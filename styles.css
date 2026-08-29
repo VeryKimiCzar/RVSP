@@ -349,29 +349,55 @@ a{ color: inherit; }
 .reveal-section.is-open{ grid-template-rows: 1fr; opacity:1; }
 .reveal-inner{ overflow:hidden; min-height:0; }
 
-.seats-block{ text-align:center; padding: 26px 0 6px; }
-.seat-number{
-  font-family: var(--font-display); font-style: italic; font-weight:500;
-  font-size: 44px; color: var(--brass-dark); margin: 2px 0 4px;
-}
-.seat-caption{ font-size: 12.5px; color: var(--blue-mid); margin:0; }
+.invite-block{ padding: 22px 0 6px; }
 
-.attendance-block{ padding-top: 26px; }
-.attendance-hint{ font-size: 12.5px; color: var(--blue-mid); margin: 0 0 18px; line-height:1.5; }
-
-.member-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:16px; }
-.member-row{
-  display:flex; align-items:center; gap:12px;
-  padding-bottom: 14px; border-bottom: 1px dashed var(--baby-blue);
+.person-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  padding: 12px 0; border-bottom: 1px dashed var(--baby-blue);
 }
-.member-index{
-  font-family: var(--font-display); font-style:italic; color: var(--brass);
-  font-size: 14px; flex:none; width: 18px;
-}
-.member-name{
+.person-name{
   font-family: var(--font-display); font-size: 18px; color: var(--navy);
-  flex:1 1 auto; min-width: 0;
+  flex:1 1 auto; min-width:0;
 }
+.person-row-main{ border-top: 1px dashed var(--baby-blue); }
+.person-row-main .person-name{
+  font-style: italic; font-weight:500; font-size: 24px; color: var(--brass-dark);
+}
+
+/* Chevron that expands the main match's row into a family list: same
+   surname guests appear right underneath as their own toggle rows, so a
+   group arriving together can all be marked without re-searching each
+   name individually. */
+.similar-toggle{
+  display:flex; align-items:center; gap:8px; margin-top: 10px;
+  width:100%; padding:0; background:none; border:none; cursor:pointer;
+  font-family: var(--font-body); font-size: 12px; letter-spacing:.03em;
+  color: var(--blue-mid); text-align:left;
+}
+.similar-toggle[hidden]{ display:none; }
+.similar-toggle .similar-chevron{ flex:none; transition: transform .25s var(--ease); }
+.similar-toggle[aria-expanded="true"] .similar-chevron{ transform: rotate(180deg); }
+#similarSurname{ font-weight:600; color: var(--royal); }
+
+.similar-rows{
+  overflow:hidden; max-height:0;
+  transition: max-height .35s var(--ease);
+}
+.similar-rows.is-open{ max-height: 2000px; }
+
+/* "Show all" / "Show N more" pagination shown after a batch of relative
+   rows when the full same-surname list is long. */
+.reveal-more{
+  display:flex; gap:10px; padding: 12px 0 4px; flex-wrap:wrap;
+}
+.reveal-more button{
+  padding: 7px 14px; border-radius: 999px; border: 1px solid var(--baby-blue);
+  background: var(--blue-100); font-family: var(--font-body); font-size: 11.5px;
+  letter-spacing:.04em; text-transform:uppercase; color: var(--blue-mid);
+  cursor:pointer; transition: background .2s var(--ease), color .2s var(--ease);
+}
+.reveal-more button:hover{ background: var(--baby-blue); color: var(--navy); }
+
 .member-control{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:none; }
 
 .switch{ position:relative; width:42px; height:24px; flex:none; }
@@ -408,28 +434,48 @@ a{ color: inherit; }
 .btn-primary:hover{ background: var(--royal); }
 .btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
 .btn-primary:active{ transform: scale(.98); }
-.btn-ghost{ background: transparent; color: var(--royal); border: 1px solid var(--baby-blue); margin-top: 12px; }
-.btn-ghost:hover{ background: var(--blue-100); }
 
 .deadline-note{
   text-align:center; font-size: 11.5px; letter-spacing:.08em;
   text-transform:uppercase; color: var(--blue-mid); margin: 16px 0 0;
 }
 
-.thankyou-block{ padding-top: 30px; text-align:center; }
-.thankyou-block .headline{
-  font-family: var(--font-display); font-weight:500; font-size: 24px;
-  color: var(--navy); margin: 0 0 6px;
+.thankyou-overlay{
+  position: fixed; inset: 0; z-index: 100; display: none;
+  align-items: center; justify-content: center; padding: 24px;
+  background: rgba(10, 18, 32, .58);
 }
-.thankyou-block .sub{ font-size: 13.5px; color: var(--royal); margin: 0 0 20px; }
+.thankyou-overlay.is-open{ display: flex; }
 
-.summary-list{ list-style:none; margin:0 0 22px; padding:0; display:flex; flex-direction:column; gap:8px; }
-.summary-list li{
-  display:flex; justify-content:space-between; font-size:13.5px;
-  border-bottom: 1px dashed var(--baby-blue); padding-bottom:6px;
+.thankyou-modal{
+  width: 100%; max-width: 340px; text-align: center;
+  background: linear-gradient(165deg, var(--navy) 0%, var(--royal) 130%);
+  border: 1px solid rgba(255,255,255,.3); border-radius: 6px;
+  padding: 38px 26px 30px; color: var(--paper);
+  box-shadow: 0 24px 60px rgba(0,0,0,.4);
 }
-.summary-list .status-accept{ color: var(--accept); }
-.summary-list .status-decline{ color: var(--decline); }
+.modal-spark{ display:block; font-size: 18px; color: var(--baby-blue-light); margin-bottom: 14px; }
+.modal-couple{
+  font-family: var(--font-display); font-style: italic; font-weight:500;
+  font-size: 28px; margin: 0 0 22px;
+}
+.modal-couple .amp{ font-family: var(--font-script); font-style:normal; }
+.modal-divider{ border: none; border-top: 1px solid rgba(255,255,255,.3); margin: 0 -26px 20px; }
+.modal-heading{
+  font-family: var(--font-body); font-size: 12px; letter-spacing: .3em;
+  text-transform: uppercase; color: var(--baby-blue-light); margin: 0 0 16px;
+}
+.modal-message{
+  font-family: var(--font-display); font-style: italic; font-size: 16px;
+  line-height: 1.6; margin: 0 0 28px;
+}
+.btn-modal-close{
+  padding: 10px 32px; border-radius: 2px; border: 1px solid rgba(255,255,255,.55);
+  background: none; color: var(--paper); font-family: var(--font-body);
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase; cursor: pointer;
+  transition: background .2s var(--ease);
+}
+.btn-modal-close:hover{ background: rgba(255,255,255,.12); }
 
 @media (prefers-reduced-motion: reduce){
   .hero, .board, #foldLines, #sealGroup, .reveal-section, .rsvp-panel, .switch .thumb, .switch .track{ transition:none; }
