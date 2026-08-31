@@ -484,6 +484,151 @@ guest + any touched relatives) were part of that Confirm.
 
 ---
 
+## 17. Basic abuse hardening on the Apps Script endpoint
+
+You asked what could be done to blunt a troll exploiting the now-public Apps
+Script URL (visible in the repo once pushed to GitHub). Added two lightweight
+protections to `Code.gs`, both scoped to not affect a normal guest's one-time
+RSVP:
+
+- **Per-guest write cooldown** (`RSVP_COOLDOWN_SECONDS`, 3s): rejects a second
+  write to the same Guest ID within the cooldown window, so a script hammering
+  the endpoint against one row can't spam it — a real guest only ever submits
+  once every few seconds at most anyway.
+- **Stricter ID validation** (`GUEST_ID_PATTERN`): rejects any `id` that doesn't
+  match the expected `G` + digits format outright, before it's compared against
+  the Sheet at all.
+
+Explicitly did **not** add a shared secret key embedded in `script.js` — flagged
+to you that this would be false security, since anyone who can see the deployed
+site's source can see the "secret" too.
+
+**Flagged but not changed:** `?action=list` currently returns every guest's name
+and current RSVP status to anyone who calls it directly, not just people using
+the site — this is a real privacy exposure (a troll could scrape the whole guest
+list without ever opening the invitation), not just a spam-attack risk. Fixing
+it means moving name search server-side into Apps Script so it only ever returns
+the guest(s) matching a query, which is a real architecture change (duplicated/
+ported matching logic, an extra round trip per search) rather than a quick patch
+— left as an open decision rather than made unilaterally.
+
+---
+
+## 18. Deadline updated, circling music disc added
+
+**Deadline:** the RSVP deadline note now reads **October 15, 2026** (previously
+November 8, 2026).
+
+**Music disc:** added a fixed circling music-disc control, always visible in the
+top-right corner regardless of scroll position or which screen (hero/board/RSVP)
+is showing.
+- Default state: spinning (CSS animation, ~3.2s per rotation) and in the site's
+  navy/brass colors — represents "playing." An `<audio>` element with a `<source
+  type="audio/mpeg">` is wired up for it to control; the `src` is left blank for
+  now, ready for you to drop your actual mp3 file path in.
+- Clicking it toggles to a **muted state**: the disc turns gray and stops
+  spinning, and the audio is paused and muted. Clicking again reverses all of
+  that — colored, spinning, and unmuted/playing again.
+- Since the site also tries to start the music the moment the envelope is
+  tapped (browsers block audio autoplay until a real user interaction happens,
+  and the envelope tap is the first one on this page), it should begin playing
+  right as the invitation opens rather than needing the disc to be clicked
+  first — clicking the disc after that is purely a mute/pause control.
+
+---
+
+## 19. Real monogram image on the envelope seal; asset paths finalized
+
+You shared the actual A&P monogram artwork and asked for it to replace the
+placeholder text on the envelope seal, to live at `assets/photos/monogram.png`,
+and for the background music file to move to `assets/bgm.mp3`.
+
+- The seal's `A & P` SVG text is gone. In its place: the seal's inner circle
+  is now a light backdrop (previously just an outline) so the monogram's navy
+  linework actually shows up against it, with the `monogram.png` image laid on
+  top and clipped to a circle so it sits neatly inside the seal's border ring
+  rather than being a square image poking out.
+- `bgMusic`'s `<source>` now points at `assets/bgm.mp3` directly (no more blank
+  placeholder to fill in later).
+- Expected file layout is now `assets/bgm.mp3` and `assets/photos/monogram.png`,
+  both relative to `index.html` — same folder it's already in.
+
+---
+
+## 20. Monogram fixed: white artwork needs the navy backdrop back, sized up
+
+You recolored the monogram artwork to white (still a transparent PNG), which is
+why it went invisible against step 19's light cream seal backdrop — a white
+mark needs a dark background, not a light one. Reverted the seal's inner circle
+to `fill="none"` (its original state, before the monogram change, letting the
+outer navy gradient circle show through as the backdrop) instead of the cream
+fill. Also enlarged the monogram noticeably — clip radius 23→26, image box
+54×54→70×70 — since it was reading too small at the old size regardless of
+color.
+
+---
+
+## 21. Fixed startup delay on the background music
+
+You noticed the song was delayed when playing. Cause: `preload="none"` on the
+`<audio>` element meant the browser didn't fetch any of `bgm.mp3` until `play()`
+was actually called on envelope tap — so playback had to wait on the download
+to start and buffer at that exact moment. Changed to `preload="auto"`, so the
+browser starts fetching the file in the background as soon as the page loads,
+well before the envelope is tapped.
+
+---
+
+## 22. Fixed: music needed two disc clicks to actually start
+
+You noticed the music only started after clicking the disc twice. Cause: the
+click handler tracked its own `musicMuted` flag rather than checking the audio
+element's real state. The envelope-tap autoplay attempt from step 18 is
+commonly blocked by the browser's autoplay-with-sound policy, so the audio was
+actually still paused even though the flag assumed it was "playing" — the first
+click then just toggled that already-paused state to "muted" (a no-op you'd
+never notice), and only the second click actually flipped it to play.
+
+Fixed by having the click handler check `bgMusic.paused` / `bgMusic.muted`
+directly each time instead of trusting a separately-tracked flag, so the very
+first click always does the right thing regardless of whether the earlier
+autoplay attempt silently succeeded or failed.
+
+---
+
+## 23. Fixed: music still not starting on envelope tap, only on disc click
+
+Step 22's fix corrected the flag/state desync, but the music still only started
+when the disc was clicked, not on the envelope tap. Root cause: some browsers
+still refuse to start audio *with sound* the first time, even from a genuine
+click handler — muted autoplay is the one thing browsers reliably allow without
+any gesture at all.
+
+Switched to that pattern instead of fighting the gate directly:
+- `bgMusic.muted = true; bgMusic.play()` now runs immediately at page load
+  (top-level, no click needed) — always permitted since it's silent.
+- The envelope tap now just sets `bgMusic.muted = false` instead of calling
+  `play()` fresh — since the track is already playing in the background,
+  unmuting it doesn't re-trigger the autoplay restriction the way starting
+  playback from scratch does.
+- The disc toggle simplified to just flipping `muted` (with a `play()` fallback
+  only if it's somehow paused) rather than pausing/resuming playback each
+  click, since there's no more benefit to actually stopping playback versus
+  muting it.
+
+---
+
+## 24. Added a "Tap for music" hint next to the disc
+
+You asked for something pointing people toward the music disc so they don't
+miss the song. Added a small pill-shaped hint bubble ("Tap for music") to the
+left of the disc with a little pointer triangle aimed at it, gently bobbing to
+catch the eye. It fades out on its own after 6 seconds, or immediately the
+moment someone actually taps the disc — whichever comes first — so it doesn't
+linger once it's done its job.
+
+---
+
 ## Still placeholder / not yet built (per the original phased plan)
 - Real couple photos (three blank photo slots waiting for images)
 - Real venue name, date confirmation, and map link

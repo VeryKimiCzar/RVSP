@@ -11,6 +11,23 @@
 </head>
 <body>
 
+  <!-- Always-visible circling music disc, top right. Spins + plays by
+       default; clicking toggles it to a paused, grayed-out, muted state.
+       Expects the audio file at assets/bgm.mp3. -->
+  <button class="music-disc" id="musicDisc" type="button" aria-label="Toggle background music" aria-pressed="false">
+    <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="28" fill="#16274a" stroke="#f3f7fb" stroke-width="1.5"/>
+      <circle cx="30" cy="30" r="20" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
+      <circle cx="30" cy="30" r="14" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+      <circle cx="30" cy="30" r="6" fill="#b3925c"/>
+      <circle cx="30" cy="30" r="2" fill="#16274a"/>
+    </svg>
+  </button>
+  <p class="music-hint" id="musicHint">Tap for music</p>
+  <audio id="bgMusic" loop preload="auto">
+    <source src="assets/bgm.mp3" type="audio/mpeg">
+  </audio>
+
   <!-- =========================================================
        HERO — background photo, script heading, envelope to tap
        ========================================================= -->
@@ -32,6 +49,9 @@
               <stop offset="0" stop-color="#2c4a78"/>
               <stop offset="1" stop-color="#16274a"/>
             </radialGradient>
+            <clipPath id="sealClip">
+              <circle cx="150" cy="120" r="26"/>
+            </clipPath>
           </defs>
 
           <rect x="4" y="4" width="292" height="202" rx="16" fill="url(#envGrad)" stroke="rgba(255,255,255,.5)" stroke-width="1.5"/>
@@ -48,7 +68,7 @@
           <g id="sealGroup">
             <circle cx="150" cy="120" r="30" fill="url(#sealGrad)" stroke="#dbe8f6" stroke-width="2"/>
             <circle cx="150" cy="120" r="24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1"/>
-            <text x="150" y="127" text-anchor="middle" font-family="'Cormorant Garamond', serif" font-style="italic" font-size="19" fill="#f3f7fb">A &amp; P</text>
+            <image href="assets/photos/monogram.png" x="115" y="85" width="70" height="70" clip-path="url(#sealClip)" preserveAspectRatio="xMidYMid meet"/>
           </g>
         </svg>
 
@@ -222,7 +242,7 @@
               <div class="reveal-inner">
                 <div class="confirm-block">
                   <button class="btn btn-primary" id="confirmBtn">Confirm response</button>
-                  <p class="deadline-note">RSVP deadline &middot; November 8, 2026</p>
+                  <p class="deadline-note">RSVP deadline &middot; October 15, 2026</p>
                 </div>
               </div>
             </div>

@@ -126,6 +126,21 @@ const thankYouOverlay = document.getElementById("thankYouOverlay");
 const thankYouMessage = document.getElementById("thankYouMessage");
 const closeThankYouBtn = document.getElementById("closeThankYouBtn");
 
+const musicDisc = document.getElementById("musicDisc");
+const musicHint = document.getElementById("musicHint");
+const bgMusic = document.getElementById("bgMusic");
+
+// Browsers reliably allow autoplay only when muted — starting playback muted
+// right away (no gesture required) and unmuting later on a real interaction
+// is far more reliable than calling play() with sound for the first time
+// inside a click handler, which some browsers still block outright.
+bgMusic.muted = true;
+bgMusic.play().catch(() => {});
+
+// The "Tap for music" hint fades on its own after a few seconds so it
+// doesn't linger forever for people who don't need it.
+setTimeout(() => musicHint.classList.add("is-hidden"), 6000);
+
 /* ---------------------------- hero: unseal envelope ------------------- */
 document.getElementById("openBtn").addEventListener("click", () => {
   envelopeWrap.classList.add("is-unsealed");
@@ -134,6 +149,21 @@ document.getElementById("openBtn").addEventListener("click", () => {
     hero.style.display = "none";
     board.classList.add("visible");
   }, 1100);
+
+  // Audio is already playing (muted) from page load — unmuting here doesn't
+  // need to pass through the autoplay gate the way starting fresh would.
+  bgMusic.muted = false;
+});
+
+/* ---------------------------- music disc toggle ------------------------ */
+musicDisc.addEventListener("click", () => {
+  const nowMuted = !bgMusic.muted;
+  bgMusic.muted = nowMuted;
+  if(!nowMuted && bgMusic.paused) bgMusic.play().catch(() => {});
+
+  musicDisc.classList.toggle("is-muted", nowMuted);
+  musicDisc.setAttribute("aria-pressed", String(nowMuted));
+  musicHint.classList.add("is-hidden");
 });
 
 /* ---------------------------- RSVP plaque toggle ------------------------ */
