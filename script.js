@@ -1,16 +1,15 @@
 /* ================================================================
    PHASE 3/4 NOTE:
-   GUEST_LIST starts out as local mock data — the same one row = one
-   invited person shape as the Google Sheet (Guest ID | Guest Name |
-   RSVP | Response Time | Note). APPS_SCRIPT_URL below is now pointed
-   at the deployed Apps Script Web App, so loadGuestList() fetches the
-   real list from the Sheet on page load and submitRSVP() writes
-   responses back to it automatically. If you ever redeploy and get a
-   new URL, update it here — the mock GUEST_LIST above stays as a
-   fallback if the Sheet can't be reached.
+   Name search now happens SERVER-SIDE (Code.gs's ?action=search), so the
+   full guest list is never downloaded to the browser or exposed to anyone
+   just loading the page — a real fix for the privacy gap flagged earlier
+   (the old ?action=list endpoint returned every guest's name + RSVP status
+   to anyone who called it directly). MOCK_GUEST_LIST below is only used as
+   a local fallback if APPS_SCRIPT_URL is blank or the Sheet can't be
+   reached, so the site still works for offline preview/testing.
    ================================================================ */
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwOcKL_JDD3cZYx44O-PK31FP94VzL4EMZsNxOZS2mfEs0sXftUsoIXKtGmthAIJgqXxA/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxAJUmUDLJ_jZdEsNMqxQZxu9udk4pl-9brxrqkM0BksatU7elmOA18FLuZMe8bz-SDyA/exec";
 
 // How many same-surname rows to reveal per "Show N more" click.
 const REVEAL_BATCH_SIZE = 5;
@@ -20,7 +19,9 @@ const REVEAL_BATCH_SIZE = 5;
 // Matched case-insensitively, with or without a trailing period.
 const NAME_SUFFIXES = new Set(["jr", "sr", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii"]);
 
-let GUEST_LIST = [
+// Offline/fallback-only mock data — never fetched over the network, so it's
+// harmless to keep here even though it lives in a public JS file.
+const MOCK_GUEST_LIST = [
   { id: "G001", name: "Kimi Czar", status: "Pending" },
   { id: "G002", name: "Merry Chris", status: "Pending" },
   { id: "G003", name: "Marilyn Santos", status: "Pending" }
@@ -32,22 +33,6 @@ let revealedCount = 0;       // how many of currentSimilar are shown as rows
 let touchedIds = new Set();  // similar-row guest ids the user has actually toggled
 const rowInputs = new Map(); // guest id -> that row's checkbox element
 
-/* ---------------------------- guest list source -------------------------------- */
-// Fetches the live guest list from the Sheet if APPS_SCRIPT_URL is set;
-// otherwise keeps using the mock GUEST_LIST above so the site still works
-// before the backend is connected.
-async function loadGuestList(){
-  if(!APPS_SCRIPT_URL) return;
-  try{
-    const res = await fetch(`${APPS_SCRIPT_URL}?action=list`);
-    const data = await res.json();
-    if(data.ok && Array.isArray(data.guests)) GUEST_LIST = data.guests;
-  }catch(err){
-    console.warn("Could not load guest list from Google Sheet — using mock data.", err);
-  }
-}
-loadGuestList();
-
 async function submitRSVP(guest, status){
   guest.status = status;
 
@@ -57,7 +42,7 @@ async function submitRSVP(guest, status){
   }
 
   try{
-    const url = `${APPS_SCRIPT_URL}?action=rsvp&id=${encodeURIComponent(guest.id)}&status=${encodeURIComponent(status)}`;
+    const url = `${APPS_SCRIPT_URL}?action=rsvp&id=${encodeURIComponent(guest.id)}&name=${encodeURIComponent(guest.name)}&status=${encodeURIComponent(status)}`;
     return await (await fetch(url)).json();
   }catch(err){
     console.warn("Could not reach Google Sheet — RSVP kept locally only.", err);
@@ -83,22 +68,37 @@ const firstNameOf = fullName => parseName(fullName).first.split(" ")[0];
 const titleCase   = str => str.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
 /* ---------------------------- lookup -------------------------------- */
-// Returns the single best match for the typed query, plus (separately) any
-// other guests who share that match's surname. Shared-surname guests are
-// never auto-bundled — they only join a submission once their own row is
-// actually toggled.
-function findGuest(query){
+// Local fallback search (mirrors Code.gs's searchGuests() exactly) used
+// only when APPS_SCRIPT_URL is blank or unreachable.
+function findGuestLocal(query){
   const q = query.trim().toLowerCase();
   if(!q) return { match: null, similar: [] };
 
-  const match = GUEST_LIST.find(g => g.name.toLowerCase() === q)
-             || GUEST_LIST.find(g => g.name.toLowerCase().includes(q))
+  const match = MOCK_GUEST_LIST.find(g => g.name.toLowerCase() === q)
+             || MOCK_GUEST_LIST.find(g => g.name.toLowerCase().includes(q))
              || null;
   if(!match) return { match: null, similar: [] };
 
   const matchSurname = surnameOf(match.name);
-  const similar = GUEST_LIST.filter(g => g.id !== match.id && surnameOf(g.name) === matchSurname);
+  const similar = MOCK_GUEST_LIST.filter(g => g.id !== match.id && surnameOf(g.name) === matchSurname);
   return { match, similar };
+}
+
+// Tries the server-side search first (so the Sheet is never fully
+// downloaded to the browser); falls back to local mock data if there's no
+// Apps Script URL configured or the request fails for any reason.
+async function findGuest(query){
+  if(!APPS_SCRIPT_URL) return findGuestLocal(query);
+
+  try{
+    const url = `${APPS_SCRIPT_URL}?action=search&q=${encodeURIComponent(query)}`;
+    const data = await (await fetch(url)).json();
+    if(data.ok) return { match: data.match, similar: data.similar || [] };
+    throw new Error(data.error || "Search failed");
+  }catch(err){
+    console.warn("Could not reach Google Sheet for search — using mock data.", err);
+    return findGuestLocal(query);
+  }
 }
 
 /* ---------------------------- DOM references -------------------------------- */
@@ -188,8 +188,11 @@ nameInput.addEventListener("keydown", (e) => {
   handleLookup(nameInput.value);
 });
 
-function handleLookup(value){
+let lookupRequestId = 0;
+
+async function handleLookup(value){
   const trimmed = value.trim();
+  const requestId = ++lookupRequestId;
 
   if(!trimmed){
     lookupStatus.textContent = "";
@@ -198,7 +201,8 @@ function handleLookup(value){
     return;
   }
 
-  const { match, similar } = findGuest(trimmed);
+  const { match, similar } = await findGuest(trimmed);
+  if(requestId !== lookupRequestId) return; // a newer search has since started; drop this stale result
   currentGuest = match;
 
   if(match){

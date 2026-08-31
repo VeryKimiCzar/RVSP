@@ -686,7 +686,65 @@ again, matching "no pause happening, just mute and unmute."
 
 ---
 
-## Still placeholder / not yet built (per the original phased plan)
+## 27. Security pass — closed the real vulnerability, corrected a misconception
+
+You asked me to "hash" the Apps Script URL to protect it. Corrected that first:
+hashing (or any obfuscation) of the URL itself doesn't work, because the browser
+has to know the real, plaintext URL to call it — anyone can see the exact request
+in dev tools' Network tab regardless of how the source code stores it. That's not
+fixable client-side; it's not a hashing problem.
+
+What *was* fixable — the real vulnerability flagged back in step 17 and never
+resolved: **`?action=list` returned every guest's name and RSVP status to anyone
+who called the URL directly**, not just people using the site. Fixed properly
+this time, not patched around:
+
+**`Code.gs`:**
+- Removed the public `?action=list` full-roster dump. Added `?action=search&q=...`
+  instead — ported the exact same `parseName()`/`surnameOf()`/match logic that used
+  to live only in `script.js` into Apps Script, so the server now does the name
+  search itself and returns only the single matched guest plus their same-surname
+  `similar` list — never the whole sheet.
+- `?action=list` still exists but now requires a private `ADMIN_KEY` query param
+  that's set only in `Code.gs` (never shipped to `script.js` or the public site) —
+  lets you personally check the full list without leaving it open to anyone else.
+  **You'll need to change `ADMIN_KEY` from the placeholder to your own random
+  string** before this protection means anything — it deliberately refuses to work
+  with the placeholder still in place.
+- `updateRsvp()` now requires the Guest ID **and** the guest's exact name to match
+  the same row, not just the ID — raises the bar against someone blindly guessing
+  sequential IDs (G001, G002, G003...) to overwrite responses they have no business
+  touching.
+- Added a basic global rate limit (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_SECONDS`,
+  default 60 requests/60s across *all* visitors combined) via `CacheService`.
+  Honest caveat: Apps Script doesn't expose caller IPs to `doGet()`, so this can't
+  be a precise per-visitor limit — it's a blunt shared counter sized well above
+  normal wedding-site traffic, meant to slow down a scraping/spam script, not stop
+  a determined one outright.
+
+**`script.js`:**
+- `GUEST_LIST` (fetched in full on every page load) is gone. Replaced with
+  `MOCK_GUEST_LIST` — small, local, and only ever used as a fallback if
+  `APPS_SCRIPT_URL` is blank or a request fails, so the site keeps working
+  offline/during development without ever touching the network.
+- `findGuest()` now calls the new `?action=search` endpoint first and only falls
+  back to local mock matching (`findGuestLocal()`) if the Sheet is unreachable —
+  the page no longer downloads the entire guest roster just by being opened.
+- `submitRSVP()` now sends `name` alongside `id`, matching `Code.gs`'s stricter check.
+- `handleLookup()` is now `async` (search is a network call) with a small request-id
+  guard added so a slower, older search response can't overwrite a newer one if
+  someone types quickly — a correctness fix that fell out of making search async,
+  not something that was asked for directly.
+
+**Disclosed limitation, not oversold as "fully fixed":** the search endpoint still
+returns one real match per query, so a very patient attacker trying many short
+substrings one at a time could still slowly reconstruct names — this is inherent
+to any public, login-free "search your own name" pattern, not something a backend
+tweak can fully close. What changed is the *cost*: one click to dump everyone,
+versus a slow, rate-limited, one-name-at-a-time grind. That's a real improvement,
+not a perfect one.
+
+
 - Real couple photos (three blank photo slots waiting for images)
 - Real venue name, date confirmation, and map link
 - Google Sheets + Apps Script backend walkthrough (queued as the next step —
