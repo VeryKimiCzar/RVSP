@@ -130,17 +130,6 @@ const musicDisc = document.getElementById("musicDisc");
 const musicHint = document.getElementById("musicHint");
 const bgMusic = document.getElementById("bgMusic");
 
-// Browsers reliably allow autoplay only when muted — starting playback muted
-// right away (no gesture required) and unmuting later on a real interaction
-// is far more reliable than calling play() with sound for the first time
-// inside a click handler, which some browsers still block outright.
-bgMusic.muted = true;
-bgMusic.play().catch(() => {});
-
-// The "Tap for music" hint fades on its own after a few seconds so it
-// doesn't linger forever for people who don't need it.
-setTimeout(() => musicHint.classList.add("is-hidden"), 6000);
-
 /* ---------------------------- hero: unseal envelope ------------------- */
 document.getElementById("openBtn").addEventListener("click", () => {
   envelopeWrap.classList.add("is-unsealed");
@@ -149,20 +138,28 @@ document.getElementById("openBtn").addEventListener("click", () => {
     hero.style.display = "none";
     board.classList.add("visible");
   }, 1100);
-
-  // Audio is already playing (muted) from page load — unmuting here doesn't
-  // need to pass through the autoplay gate the way starting fresh would.
-  bgMusic.muted = false;
 });
 
-/* ---------------------------- music disc toggle ------------------------ */
+/* ---------------------------- music disc ------------------------ */
+// The disc is the only thing that starts the music — nothing plays
+// automatically on load or on the envelope tap. That way the track always
+// starts from 0:00 the moment someone actually taps it, instead of having
+// played silently in the background since page load and jumping in
+// mid-track once unmuted. Once it's playing, the disc becomes a plain
+// mute/unmute switch — the audio itself is never paused again.
 musicDisc.addEventListener("click", () => {
-  const nowMuted = !bgMusic.muted;
-  bgMusic.muted = nowMuted;
-  if(!nowMuted && bgMusic.paused) bgMusic.play().catch(() => {});
+  if(bgMusic.paused){
+    bgMusic.currentTime = 0;
+    bgMusic.muted = false;
+    bgMusic.play().catch(() => {});
+  } else {
+    bgMusic.muted = !bgMusic.muted;
+  }
 
-  musicDisc.classList.toggle("is-muted", nowMuted);
-  musicDisc.setAttribute("aria-pressed", String(nowMuted));
+  const isMuted = bgMusic.muted;
+  musicDisc.classList.toggle("is-muted", isMuted);
+  musicDisc.setAttribute("aria-label", isMuted ? "Play background music" : "Mute background music");
+  musicDisc.setAttribute("aria-pressed", String(isMuted));
   musicHint.classList.add("is-hidden");
 });
 

@@ -629,6 +629,63 @@ linger once it's done its job.
 
 ---
 
+## 25. Music disc reworked: starts as a play button, then just mutes/unmutes
+
+You pointed out that in some browsers the track can end up already playing
+(silently or even audibly, depending on that browser's own autoplay/engagement
+rules) without anyone touching the disc — so the disc's look needed to actually
+reflect reality, and its job after that first play is just toggling sound on
+and off, not "playing" and "stopping" as separate concepts.
+
+- The disc now starts in a **muted, grayed-out, non-spinning state with a play
+  triangle overlaid on it** — this matches its real starting state (`bgMusic`
+  is always started muted under the hood, per step 23) instead of visually
+  claiming to be "on" from the first frame.
+- Whichever moment actually unmutes the audio — the envelope tap, or a direct
+  click on the disc — now updates the disc's look at that exact moment: the
+  play icon disappears, the disc turns colored and starts spinning, and its
+  accessible label switches from "Play background music" to "Mute background
+  music." Previously only the disc-click handler updated this, so unmuting via
+  the envelope tap left the disc looking wrong (still showing "play") even
+  though sound had already started — the next actual click would then mute
+  already-playing audio unexpectedly, reproducing the "takes two clicks to
+  behave right" issue from step 22 in a new form.
+- After that first unmute, the disc is purely a mute/unmute switch — the
+  underlying audio is never paused again, only muted, matching what you asked
+  for ("after playing, its function is only mute and unmute").
+- The "Tap for music" hint now also disappears the moment the envelope tap
+  unmutes the audio, since it's no longer needed once sound has already
+  started that way.
+
+---
+
+## 26. Corrected: muted-autoplay start was making the track start mid-way
+
+Step 23's "start muted at page load, unmute later" approach (built to dodge
+browser autoplay-with-sound blocks) had a real side effect: since the track had
+already been playing silently since page load, the moment it got unmuted it
+was already partway through — so people heard the song start mid-track instead
+of from the beginning. You wanted the track to only ever start when the disc
+itself is tapped, playing from 0:00.
+
+**Removed entirely:**
+- The `bgMusic.muted = true; bgMusic.play()` call that used to run automatically
+  at page load.
+- The envelope-tap handler no longer touches the music at all — tapping the
+  envelope now only does the unsealing animation, nothing audio-related.
+- The hint bubble's 6-second auto-hide timer — since the disc is now the only
+  way to start the music at all (not just a fallback for browsers that blocked
+  autoplay), it stays visible until it's actually tapped rather than
+  disappearing on a timer regardless of whether anyone noticed it.
+
+**New disc behavior:** the very first click checks if the audio has never
+played (`bgMusic.paused`) — if so, it resets `currentTime` to 0, unmutes, and
+plays, so the track always starts from the beginning exactly when the disc is
+tapped. Every click after that just flips `muted` — the audio is never paused
+again, matching "no pause happening, just mute and unmute."
+
+---
+
 ## Still placeholder / not yet built (per the original phased plan)
 - Real couple photos (three blank photo slots waiting for images)
 - Real venue name, date confirmation, and map link

@@ -11,17 +11,20 @@
 </head>
 <body>
 
-  <!-- Always-visible circling music disc, top right. Spins + plays by
-       default; clicking toggles it to a paused, grayed-out, muted state.
+  <!-- Always-visible circling music disc, top right. Starts muted (matches
+       the actual autoplay-muted state under the hood) with a play icon
+       overlaid; the envelope tap or a click unmutes it into the normal
+       spinning/colored state. Clicking afterward just toggles mute/unmute.
        Expects the audio file at assets/bgm.mp3. -->
-  <button class="music-disc" id="musicDisc" type="button" aria-label="Toggle background music" aria-pressed="false">
-    <svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  <button class="music-disc is-muted" id="musicDisc" type="button" aria-label="Play background music" aria-pressed="true">
+    <svg class="disc-art" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
       <circle cx="30" cy="30" r="28" fill="#16274a" stroke="#f3f7fb" stroke-width="1.5"/>
       <circle cx="30" cy="30" r="20" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
       <circle cx="30" cy="30" r="14" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
       <circle cx="30" cy="30" r="6" fill="#b3925c"/>
       <circle cx="30" cy="30" r="2" fill="#16274a"/>
     </svg>
+    <svg class="play-icon" viewBox="0 0 24 24" width="16" height="16" fill="#f3f7fb" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
   </button>
   <p class="music-hint" id="musicHint">Tap for music</p>
   <audio id="bgMusic" loop preload="auto">
