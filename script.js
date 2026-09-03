@@ -1,56 +1,30 @@
-/* ================================================================
-   PHASE 3/4 NOTE:
-   Name search now happens SERVER-SIDE (Code.gs's ?action=search), so the
-   full guest list is never downloaded to the browser or exposed to anyone
-   just loading the page — a real fix for the privacy gap flagged earlier
-   (the old ?action=list endpoint returned every guest's name + RSVP status
-   to anyone who called it directly). MOCK_GUEST_LIST below is only used as
-   a local fallback if APPS_SCRIPT_URL is blank or the Sheet can't be
-   reached, so the site still works for offline preview/testing.
-   ================================================================ */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7M2CM-wCFw-ZcLeiBIB2A3v74MFKrZdPO24kvgEvUL8HvQrPcYpd--HFw75ei82CQqQ/exec";
 
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxAJUmUDLJ_jZdEsNMqxQZxu9udk4pl-9brxrqkM0BksatU7elmOA18FLuZMe8bz-SDyA/exec";
-
-// How many same-surname rows to reveal per "Show N more" click.
 const REVEAL_BATCH_SIZE = 5;
 
-// Common generational suffixes that should never be treated as a surname,
-// e.g. "Brandon Marson Jr." -> surname is "Marson", not "Jr".
-// Matched case-insensitively, with or without a trailing period.
 const NAME_SUFFIXES = new Set(["jr", "sr", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii"]);
 
-// Offline/fallback-only mock data — never fetched over the network, so it's
-// harmless to keep here even though it lives in a public JS file.
-const MOCK_GUEST_LIST = [
-  { id: "G001", name: "Kimi Czar", status: "Pending" },
-  { id: "G002", name: "Merry Chris", status: "Pending" },
-  { id: "G003", name: "Marilyn Santos", status: "Pending" }
-];
-
-let currentGuest = null;     // the person actually searched for
-let currentSimilar = [];     // other guests sharing that person's surname
-let revealedCount = 0;       // how many of currentSimilar are shown as rows
-let touchedIds = new Set();  // similar-row guest ids the user has actually toggled
-const rowInputs = new Map(); // guest id -> that row's checkbox element
+let currentGuest = null;
+let currentSimilar = [];
+let revealedCount = 0;
+let touchedIds = new Set();
+const rowInputs = new Map();
 
 async function submitRSVP(guest, status){
-  guest.status = status;
-
   if(!APPS_SCRIPT_URL){
-    console.log("RSVP submitted (mock, no Sheet connected)", guest.id, status);
-    return { ok: true };
+    return { ok: false, error: "connection" };
   }
 
   try{
     const url = `${APPS_SCRIPT_URL}?action=rsvp&id=${encodeURIComponent(guest.id)}&name=${encodeURIComponent(guest.name)}&status=${encodeURIComponent(status)}`;
-    return await (await fetch(url)).json();
+    const data = await (await fetch(url)).json();
+    if(data.ok) guest.status = status;
+    return data;
   }catch(err){
-    console.warn("Could not reach Google Sheet — RSVP kept locally only.", err);
-    return { ok: false, error: err.message };
+    return { ok: false, error: "connection" };
   }
 }
 
-/* ---------------------------- name helpers -------------------------------- */
 function parseName(fullName){
   const parts = fullName.trim().split(/\s+/);
   if(parts.length === 1) return { first: parts[0], last: parts[0], suffix: "" };
@@ -63,45 +37,22 @@ function parseName(fullName){
     : { first: parts.slice(0, -1).join(" "), last: lastToken, suffix: "" };
 }
 
-const surnameOf   = fullName => parseName(fullName).last.toLowerCase();
-const firstNameOf = fullName => parseName(fullName).first.split(" ")[0];
-const titleCase   = str => str.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+const surnameOf = fullName => parseName(fullName).last.toLowerCase();
+const titleCase = str => str.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
-/* ---------------------------- lookup -------------------------------- */
-// Local fallback search (mirrors Code.gs's searchGuests() exactly) used
-// only when APPS_SCRIPT_URL is blank or unreachable.
-function findGuestLocal(query){
-  const q = query.trim().toLowerCase();
-  if(!q) return { match: null, similar: [] };
-
-  const match = MOCK_GUEST_LIST.find(g => g.name.toLowerCase() === q)
-             || MOCK_GUEST_LIST.find(g => g.name.toLowerCase().includes(q))
-             || null;
-  if(!match) return { match: null, similar: [] };
-
-  const matchSurname = surnameOf(match.name);
-  const similar = MOCK_GUEST_LIST.filter(g => g.id !== match.id && surnameOf(g.name) === matchSurname);
-  return { match, similar };
-}
-
-// Tries the server-side search first (so the Sheet is never fully
-// downloaded to the browser); falls back to local mock data if there's no
-// Apps Script URL configured or the request fails for any reason.
 async function findGuest(query){
-  if(!APPS_SCRIPT_URL) return findGuestLocal(query);
+  if(!APPS_SCRIPT_URL) return { match: null, similar: [], error: true };
 
   try{
     const url = `${APPS_SCRIPT_URL}?action=search&q=${encodeURIComponent(query)}`;
     const data = await (await fetch(url)).json();
-    if(data.ok) return { match: data.match, similar: data.similar || [] };
-    throw new Error(data.error || "Search failed");
+    if(data.ok) return { match: data.match, similar: data.similar || [], error: false };
+    return { match: null, similar: [], error: true };
   }catch(err){
-    console.warn("Could not reach Google Sheet for search — using mock data.", err);
-    return findGuestLocal(query);
+    return { match: null, similar: [], error: true };
   }
 }
 
-/* ---------------------------- DOM references -------------------------------- */
 const hero = document.getElementById("hero");
 const envelopeWrap = document.getElementById("envelopeWrap");
 const board = document.getElementById("board");
@@ -117,6 +68,7 @@ const inviteName = document.getElementById("inviteName");
 const attendToggle = document.getElementById("attendToggle");
 const attendLabel = document.getElementById("attendLabel");
 const confirmBtn = document.getElementById("confirmBtn");
+const confirmStatus = document.getElementById("confirmStatus");
 
 const similarToggle = document.getElementById("similarToggle");
 const similarSurnameEl = document.getElementById("similarSurname");
@@ -126,11 +78,21 @@ const thankYouOverlay = document.getElementById("thankYouOverlay");
 const thankYouMessage = document.getElementById("thankYouMessage");
 const closeThankYouBtn = document.getElementById("closeThankYouBtn");
 
+const entourageOpen = document.getElementById("entourageOpen");
+const entourageOverlay = document.getElementById("entourageOverlay");
+const entourageClose = document.getElementById("entourageClose");
+const entourageReturn = document.getElementById("entourageReturn");
+const entourageStatus = document.getElementById("entourageStatus");
+
+const detailsOpen = document.getElementById("detailsOpen");
+const detailsOverlay = document.getElementById("detailsOverlay");
+const detailsClose = document.getElementById("detailsClose");
+const detailsReturn = document.getElementById("detailsReturn");
+
 const musicDisc = document.getElementById("musicDisc");
 const musicHint = document.getElementById("musicHint");
 const bgMusic = document.getElementById("bgMusic");
 
-/* ---------------------------- hero: unseal envelope ------------------- */
 document.getElementById("openBtn").addEventListener("click", () => {
   envelopeWrap.classList.add("is-unsealed");
   setTimeout(() => hero.classList.add("is-leaving"), 400);
@@ -140,13 +102,6 @@ document.getElementById("openBtn").addEventListener("click", () => {
   }, 1100);
 });
 
-/* ---------------------------- music disc ------------------------ */
-// The disc is the only thing that starts the music — nothing plays
-// automatically on load or on the envelope tap. That way the track always
-// starts from 0:00 the moment someone actually taps it, instead of having
-// played silently in the background since page load and jumping in
-// mid-track once unmuted. Once it's playing, the disc becomes a plain
-// mute/unmute switch — the audio itself is never paused again.
 musicDisc.addEventListener("click", () => {
   if(bgMusic.paused){
     bgMusic.currentTime = 0;
@@ -163,7 +118,6 @@ musicDisc.addEventListener("click", () => {
   musicHint.classList.add("is-hidden");
 });
 
-/* ---------------------------- RSVP plaque toggle ------------------------ */
 rsvpToggle.addEventListener("click", () => {
   const opening = !rsvpPanel.classList.contains("is-open");
   rsvpPanel.classList.toggle("is-open", opening);
@@ -175,7 +129,6 @@ rsvpToggle.addEventListener("click", () => {
   }
 });
 
-/* ---------------------------- name lookup -------------------------------- */
 let debounceTimer;
 nameInput.addEventListener("input", () => {
   clearTimeout(debounceTimer);
@@ -201,9 +154,17 @@ async function handleLookup(value){
     return;
   }
 
-  const { match, similar } = await findGuest(trimmed);
-  if(requestId !== lookupRequestId) return; // a newer search has since started; drop this stale result
+  const { match, similar, error } = await findGuest(trimmed);
+  if(requestId !== lookupRequestId) return;
   currentGuest = match;
+
+  if(error){
+    lookupStatus.classList.add("is-error");
+    lookupStatus.innerHTML = '<span class="dot"></span> We couldn\'t connect to the server. Please try again in a moment.';
+    closeSection(inviteSection); closeSection(confirmSection);
+    resetSimilar();
+    return;
+  }
 
   if(match){
     lookupStatus.classList.remove("is-error");
@@ -235,7 +196,6 @@ function setAttendLabel(labelEl, isAttending){
 
 attendToggle.addEventListener("change", () => setAttendLabel(attendLabel, attendToggle.checked));
 
-/* ---------------------------- shared-surname rows -------------------------------- */
 function resetSimilar(){
   currentSimilar = [];
   revealedCount = 0;
@@ -256,9 +216,6 @@ function populateSimilar(match, similar){
   similarToggle.hidden = false;
 }
 
-// One name+toggle row, shared between the main match and every relative
-// revealed under it. Only fires into `touchedIds` when its own switch is
-// actually flipped — just being revealed doesn't opt anyone in.
 function buildPersonRow(guest){
   const isAttending = guest.status === "Attending";
 
@@ -305,8 +262,6 @@ function renderSimilarRows(){
   showAllBtn.addEventListener("click", () => revealMore(currentSimilar.length));
   controls.appendChild(showAllBtn);
 
-  // A "show N more" choice is only meaningful when more than one batch
-  // remains — otherwise it's identical to "Show all".
   if(remaining > REVEAL_BATCH_SIZE){
     const showMoreBtn = document.createElement("button");
     showMoreBtn.type = "button";
@@ -322,8 +277,6 @@ similarToggle.addEventListener("click", () => {
   const opening = !similarRows.classList.contains("is-open");
 
   if(opening && revealedCount === 0 && currentSimilar.length){
-    // First time opening: if the whole list already fits in one batch,
-    // just show it — a "N more" choice would be pointless.
     if(currentSimilar.length <= REVEAL_BATCH_SIZE) revealedCount = currentSimilar.length;
     renderSimilarRows();
   }
@@ -332,11 +285,12 @@ similarToggle.addEventListener("click", () => {
   similarToggle.setAttribute("aria-expanded", String(opening));
 });
 
-/* ---------------------------- confirm + thank you -------------------- */
 confirmBtn.addEventListener("click", async () => {
   if(!currentGuest) return;
   confirmBtn.disabled = true;
   confirmBtn.textContent = "Sending…";
+  confirmStatus.textContent = "";
+  confirmStatus.classList.remove("is-error");
 
   const submissions = [{ guest: currentGuest, accepted: attendToggle.checked }];
   touchedIds.forEach(id => {
@@ -345,14 +299,21 @@ confirmBtn.addEventListener("click", async () => {
     if(guest && input) submissions.push({ guest, accepted: input.checked });
   });
 
+  const results = [];
   for(const { guest, accepted } of submissions){
-    await submitRSVP(guest, accepted ? "Attending" : "Declined");
+    results.push(await submitRSVP(guest, accepted ? "Attending" : "Declined"));
   }
-
-  showThankYou(submissions);
 
   confirmBtn.disabled = false;
   confirmBtn.textContent = "Confirm response";
+
+  if(results.some(r => !r.ok)){
+    confirmStatus.classList.add("is-error");
+    confirmStatus.innerHTML = '<span class="dot"></span> We couldn\'t reach the server. Please try again in a moment.';
+    return;
+  }
+
+  showThankYou(submissions);
 });
 
 function showThankYou(submissions){
@@ -367,4 +328,161 @@ function showThankYou(submissions){
 
 closeThankYouBtn.addEventListener("click", () => {
   thankYouOverlay.classList.remove("is-open");
+});
+
+const ENTOURAGE_ROLE_MAP = {
+  "primary principal": "entPrimaryPrincipal",
+  "best man": "entBestMan",
+  "maid of honor": "entMaidOfHonor",
+  "veil": "entVeil",
+  "cord": "entCord",
+  "candle": "entCandle",
+  "bridesmaid": "entBridesmaids",
+  "groomsman": "entGroomsmen"
+};
+
+let entourageLoaded = false;
+
+async function loadEntourage(){
+  if(entourageLoaded) return;
+  entourageStatus.textContent = "";
+  entourageStatus.classList.remove("is-error");
+
+  if(!APPS_SCRIPT_URL){
+    showEntourageError();
+    return;
+  }
+
+  try{
+    const data = await (await fetch(`${APPS_SCRIPT_URL}?action=entourage`)).json();
+    if(!data.ok) throw new Error();
+    renderEntourage(data.entourage || []);
+    entourageLoaded = true;
+  }catch(err){
+    showEntourageError();
+  }
+}
+
+function showEntourageError(){
+  entourageStatus.classList.add("is-error");
+  entourageStatus.innerHTML = '<span class="dot"></span> We couldn\'t load the entourage list. Please try again in a moment.';
+}
+
+function renderEntourage(entries){
+  const grouped = {};
+  entries.forEach(entry => {
+    const containerId = ENTOURAGE_ROLE_MAP[entry.role.toLowerCase()];
+    if(!containerId) return;
+    if(!grouped[containerId]) grouped[containerId] = [];
+    grouped[containerId].push(entry.name);
+  });
+
+  Object.values(ENTOURAGE_ROLE_MAP).forEach(containerId => {
+    const container = document.getElementById(containerId);
+    if(!container) return;
+    container.innerHTML = "";
+
+    const names = grouped[containerId];
+    if(names && names.length){
+      names.forEach(name => {
+        const pill = document.createElement("div");
+        pill.className = "ent-pill";
+        pill.textContent = name;
+        container.appendChild(pill);
+      });
+    } else {
+      container.appendChild(document.createElement("div")).className = "ent-pill";
+    }
+  });
+}
+
+entourageOpen.addEventListener("click", () => {
+  entourageOverlay.classList.add("is-open");
+  loadEntourage();
+});
+entourageClose.addEventListener("click", () => {
+  entourageOverlay.classList.remove("is-open");
+});
+entourageReturn.addEventListener("click", (e) => {
+  e.preventDefault();
+  entourageOverlay.classList.remove("is-open");
+});
+
+// Ceremony start time — also the countdown's target and the day the
+// calendar highlights. Update this if the date/time ever changes.
+const WEDDING_DATE = new Date(2026, 11, 8, 14, 30); // Dec 8, 2026, 2:30 PM
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+const calendarMonthLabel = document.getElementById("calendarMonthLabel");
+const calendarGrid = document.getElementById("calendarGrid");
+const cdDays = document.getElementById("cdDays");
+const cdHours = document.getElementById("cdHours");
+const cdMinutes = document.getElementById("cdMinutes");
+const cdSeconds = document.getElementById("cdSeconds");
+
+let countdownInterval = null;
+
+function buildCalendar(){
+  const year = WEDDING_DATE.getFullYear();
+  const month = WEDDING_DATE.getMonth();
+  const targetDay = WEDDING_DATE.getDate();
+
+  calendarMonthLabel.textContent = `${MONTH_NAMES[month]} ${year}`;
+  calendarGrid.innerHTML = "";
+
+  ["S", "M", "T", "W", "T", "F", "S"].forEach(d => {
+    const dow = document.createElement("span");
+    dow.className = "mini-calendar-dow";
+    dow.textContent = d;
+    calendarGrid.appendChild(dow);
+  });
+
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for(let i = 0; i < firstWeekday; i++){
+    calendarGrid.appendChild(document.createElement("span"));
+  }
+  for(let day = 1; day <= daysInMonth; day++){
+    const cell = document.createElement("span");
+    cell.className = "mini-calendar-day" + (day === targetDay ? " is-target" : "");
+    cell.textContent = day;
+    calendarGrid.appendChild(cell);
+  }
+}
+
+function updateCountdown(){
+  const remaining = WEDDING_DATE - new Date();
+  const clamped = Math.max(remaining, 0);
+
+  const days = Math.floor(clamped / 86400000);
+  const hours = Math.floor((clamped % 86400000) / 3600000);
+  const minutes = Math.floor((clamped % 3600000) / 60000);
+  const seconds = Math.floor((clamped % 60000) / 1000);
+
+  cdDays.textContent = String(days).padStart(2, "0");
+  cdHours.textContent = String(hours).padStart(2, "0");
+  cdMinutes.textContent = String(minutes).padStart(2, "0");
+  cdSeconds.textContent = String(seconds).padStart(2, "0");
+}
+
+buildCalendar(); // static — only needs to run once
+
+detailsOpen.addEventListener("click", () => {
+  detailsOverlay.classList.add("is-open");
+  if(!countdownInterval){
+    updateCountdown();
+    countdownInterval = setInterval(updateCountdown, 1000);
+  }
+});
+detailsClose.addEventListener("click", () => {
+  detailsOverlay.classList.remove("is-open");
+  clearInterval(countdownInterval);
+  countdownInterval = null;
+});
+detailsReturn.addEventListener("click", (e) => {
+  e.preventDefault();
+  detailsOverlay.classList.remove("is-open");
+  clearInterval(countdownInterval);
+  countdownInterval = null;
 });

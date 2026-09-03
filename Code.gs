@@ -1,34 +1,12 @@
-/* ================================================================
-   Wedding RSVP — Google Apps Script backend
-   Deploy this bound to the Google Sheet that holds the guest list.
-   Sheet tab must be named exactly what SHEET_NAME says below, with
-   headers in row 1: Guest ID | Guest Name | RSVP | Response Time | Note
-   ================================================================ */
+const SHEET_NAME = "Guests";
+const ENTOURAGE_SHEET_NAME = "Entourage";
 
-const SHEET_NAME = "Guests"; // change this if your tab is named differently
+const ADMIN_KEY = "CHANGE_ME_TO_A_LONG_RANDOM_STRING";
 
-// Set this to any long random string of your own choosing, then keep it
-// private — it's server-side only and is NEVER shipped to script.js or
-// anywhere a site visitor can see it. It exists purely so *you* can pull
-// the full guest list (?action=list&key=...) for your own checking without
-// that same endpoint being open to anyone who finds the deployed URL.
-const ADMIN_KEY = "qwerty";
-
-// Rejects a second write to the same Guest ID within this many seconds —
-// blunts a script hammering one row, without affecting a real guest who
-// only ever submits once every few seconds at most anyway.
 const RSVP_COOLDOWN_SECONDS = 3;
 
-// Guest IDs must look like this (e.g. "G001") — anything else is rejected
-// before it's even compared against the Sheet.
 const GUEST_ID_PATTERN = /^G\d+$/;
 
-// Basic global throttle across ALL visitors combined (Apps Script doesn't
-// expose the caller's IP, so a true per-visitor limit isn't possible here —
-// this is a blunt instrument to slow down a scraping/spam script, not a
-// precise one). A real guest's whole visit is a handful of requests; this
-// threshold is set well above normal traffic so it shouldn't ever trip
-// during ordinary use.
 const RATE_LIMIT_MAX = 60;
 const RATE_LIMIT_WINDOW_SECONDS = 60;
 
@@ -44,6 +22,9 @@ function doGet(e) {
   }
   if (action === "rsvp") {
     return respond(updateRsvp(e.parameter.id, e.parameter.name, e.parameter.status));
+  }
+  if (action === "entourage") {
+    return respond(listEntourage());
   }
   if (action === "list") {
     if (e.parameter.key !== ADMIN_KEY || ADMIN_KEY === "CHANGE_ME_TO_A_LONG_RANDOM_STRING") {
@@ -63,17 +44,12 @@ function getAllGuestRows() {
   const guests = [];
   for (let i = 1; i < rows.length; i++) {
     const id = rows[i][0];
-    if (!id) continue; // skip blank rows
+    if (!id) continue;
     guests.push({ id: id, name: rows[i][1], status: rows[i][2] || "Pending" });
   }
   return guests;
 }
 
-/* ----------------------------------------------------------------
-   Name matching — mirrors script.js's parseName()/surnameOf() logic
-   exactly, so search results here match what the site used to compute
-   client-side. Keep these two in sync if you ever change one.
-   ---------------------------------------------------------------- */
 const NAME_SUFFIXES = ["jr", "sr", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii"];
 
 function surnameOf(fullName) {
@@ -84,11 +60,6 @@ function surnameOf(fullName) {
   return (isSuffix && parts.length > 2 ? parts[parts.length - 2] : parts[parts.length - 1]).toLowerCase();
 }
 
-// Returns the single best match for the typed query, plus any other
-// guests sharing that match's surname. Only ever returns ONE guest as the
-// direct match (never a full list of everyone containing the query) —
-// that's what keeps this from being usable to scrape the whole roster the
-// way the old ?action=list endpoint was.
 function searchGuests(query) {
   const q = (query || "").trim().toLowerCase();
   if (!q || q.length > 100) return { ok: true, match: null, similar: [] };
@@ -106,15 +77,10 @@ function searchGuests(query) {
   return { ok: true, match: match, similar: similar };
 }
 
-// Admin-only full export — never called by the public site, see doGet().
 function listGuests() {
   return { ok: true, guests: getAllGuestRows() };
 }
 
-// Flips one guest's RSVP column and stamps Response Time. Never touches Note.
-// Requires BOTH the Guest ID and the guest's exact name to match the same
-// row — raises the bar against someone just guessing sequential IDs
-// (G001, G002, ...) without actually knowing who they belong to.
 function updateRsvp(id, name, status) {
   if (!id || !GUEST_ID_PATTERN.test(id)) {
     return { ok: false, error: "Invalid request" };
@@ -141,9 +107,9 @@ function updateRsvp(id, name, status) {
       if (String(rows[i][1]).trim().toLowerCase() !== wantedName) {
         return { ok: false, error: "Guest not found" };
       }
-      const rowNum = i + 1; // sheet rows are 1-indexed, header is row 1
-      sheet.getRange(rowNum, 3).setValue(status);     // column C: RSVP
-      sheet.getRange(rowNum, 4).setValue(new Date());  // column D: Response Time
+      const rowNum = i + 1;
+      sheet.getRange(rowNum, 3).setValue(status);
+      sheet.getRange(rowNum, 4).setValue(new Date());
       cache.put(cooldownKey, "1", RSVP_COOLDOWN_SECONDS);
       return { ok: true, id: id, status: status };
     }
@@ -152,11 +118,28 @@ function updateRsvp(id, name, status) {
   return { ok: false, error: "Guest not found" };
 }
 
-/* ----------------------------------------------------------------
-   Basic global rate limit. Not per-visitor (Apps Script doesn't expose
-   caller IPs to doGet), just a blunt shared counter — see the constants
-   at the top for why the threshold is set where it is.
-   ---------------------------------------------------------------- */
+function listEntourage() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ENTOURAGE_SHEET_NAME);
+  if (!sheet) return { ok: true, entourage: [] };
+
+  const rows = sheet.getDataRange().getValues();
+  const entourage = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const role = rows[i][0];
+    const name = rows[i][1];
+    if (!role || !name) continue;
+    entourage.push({
+      role: String(role).trim(),
+      name: String(name).trim(),
+      order: Number(rows[i][2]) || 0
+    });
+  }
+
+  entourage.sort((a, b) => a.order - b.order);
+  return { ok: true, entourage: entourage };
+}
+
 function isRateLimited() {
   const cache = CacheService.getScriptCache();
   const key = "global_request_count";

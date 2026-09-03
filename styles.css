@@ -1,6 +1,4 @@
-/* ============================================================
-   DESIGN TOKENS — navy / baby-blue / royal-blue wedding motif
-   ============================================================ */
+
 :root{
   --ink:        #16233f;
   --navy:       #16274a;
@@ -34,11 +32,6 @@ button{ font-family: inherit; cursor:pointer; }
 button:focus-visible{ outline: 2px solid #fff; outline-offset: 3px; }
 a{ color: inherit; }
 
-/* ============================================================
-   MUSIC DISC — fixed top-right, always visible, spins while
-   playing, grays out and stops when muted.
-   ============================================================ */
-
 .music-disc{
   position: fixed; top: 16px; right: 16px; z-index: 200;
   width: 44px; height: 44px; padding: 0; border: none;
@@ -55,8 +48,6 @@ a{ color: inherit; }
   filter: grayscale(1) opacity(.55);
 }
 
-/* Play triangle overlaid on the disc while muted, so the muted state reads
-   as "tap to play" rather than just looking like a stalled icon. */
 .music-disc .play-icon{
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   opacity: 0; pointer-events: none;
@@ -91,10 +82,6 @@ a{ color: inherit; }
   50%{ transform: translateY(calc(-50% - 3px)); }
 }
 
-/* ============================================================
-   HERO — full-bleed photo, script heading, envelope to unseal.
-   ============================================================ */
-
 .hero{
   position: fixed; inset: 0;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -106,12 +93,6 @@ a{ color: inherit; }
 }
 .hero.is-leaving{ opacity:0; transform: scale(1.04); pointer-events:none; }
 
-/* ---- Background photo -------------------------------------------------
-   Placeholder gradient standing in for the couple's photo.
-   TO USE YOUR OWN PHOTO: place the image file in this folder and
-   replace the "background:" line below with, e.g.:
-     background: url('your-photo.jpg') center / cover no-repeat;
-   ------------------------------------------------------------------- */
 .bg-photo{
   position:absolute; inset:0; z-index:0;
   background:
@@ -135,6 +116,8 @@ a{ color: inherit; }
 }
 
 .envelope-wrap{ position: relative; width: min(72vw, 300px); }
+@media (min-width: 700px){ .envelope-wrap{ width: min(40vw, 380px); } }
+@media (min-width: 1100px){ .envelope-wrap{ width: min(26vw, 440px); } }
 .envelope-wrap svg{
   width:100%; height:auto; display:block;
   filter: drop-shadow(0 22px 40px rgba(0,0,0,.4));
@@ -163,10 +146,6 @@ a{ color: inherit; }
   text-align:center;
 }
 
-/* ============================================================
-   BOARD — scrapbook-style page revealed after unsealing
-   ============================================================ */
-
 .board{
   display:none;
   min-height:100vh;
@@ -178,7 +157,19 @@ a{ color: inherit; }
 
 .board > *{ max-width: 760px; margin-left:auto; margin-right:auto; }
 
-/* generic "card" base shared by badges, photos, decorative pieces */
+/* On tablet/desktop, let the showcase content (title plaque, photo
+   collage) actually use the extra width instead of floating as a
+   phone-width column with dead space on both sides. The RSVP card and
+   title plaque get their own tighter caps further down so they stay
+   readable/proportioned instead of stretching into oversized forms. */
+@media (min-width: 700px){
+  .board{ padding-left: 32px; padding-right: 32px; }
+  .board > *{ max-width: 900px; }
+}
+@media (min-width: 1100px){
+  .board > *{ max-width: 1080px; }
+}
+
 .card{
   border-radius: 20px;
   box-shadow: 0 14px 28px -12px rgba(6,12,26,.45);
@@ -187,6 +178,13 @@ a{ color: inherit; }
   padding: 20px;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   text-align:center;
+  /* Lets this card's own children respond to how wide THIS card actually
+     renders (via @container rules below) rather than the viewport — the
+     same card ends up a very different width depending on whether the
+     masonry grid is showing 2, 3, or 4 columns, and container queries let
+     its internal text/spacing follow that real number instead of us
+     guessing it from a media query. */
+  container-type: inline-size;
 }
 .tilt-l{ transform: rotate(-1.6deg); }
 .tilt-r{ transform: rotate(1.6deg); }
@@ -199,15 +197,16 @@ a{ color: inherit; }
   align-items: start;
 }
 @media (min-width: 620px){ .masonry{ grid-template-columns: repeat(3, 1fr); } }
-.card{ margin: 0; } /* grid gap handles spacing instead of per-card margin */
+@media (min-width: 1100px){ .masonry{ grid-template-columns: repeat(4, 1fr); gap: 18px; } }
+.card{ margin: 0; }
 .decorative{ position: relative; z-index: 2; margin: -14px 0; }
 
-/* ---- Title plaque ------------------------------------------------- */
 .plaque-title{
   background: linear-gradient(160deg, var(--royal), var(--navy));
   border-radius: 50% 50% 20px 20px / 22% 22% 8% 8%;
   box-shadow: 0 14px 28px -12px rgba(6,12,26,.45), inset 0 0 0 6px rgba(255,255,255,.12);
   padding: clamp(36px, 8vw, 52px) clamp(20px, 6vw, 32px) clamp(26px, 6vw, 36px);
+  max-width: 640px;
 }
 .flourish{
   display:block; color: var(--brass); font-size: 15px; opacity:.85;
@@ -225,13 +224,6 @@ a{ color: inherit; }
 }
 .plaque-names .amp{ color: var(--brass); font-size: .7em; }
 
-/* ---- Photo placeholders --------------------------------------------
-   Blank on purpose — swap these in once you have real photos.
-   TO ADD A PHOTO: either (a) set a background-image on the specific
-   .photo-placeholder element via an id, or (b) put an <img> tag
-   inside the <figure> and give it class "photo-fill" (see the rule
-   below) which will crop it to fill the frame.
-   ---------------------------------------------------------------- */
 .photo-card, .oval-card, .square-card{ padding: 10px; background: #fff; }
 .photo-placeholder{
   width:100%;
@@ -271,7 +263,6 @@ a{ color: inherit; }
 }
 .photo-fill{ width:100%; height:100%; object-fit: cover; border-radius: inherit; display:block; }
 
-/* ---- Badges / plaques within the board ------------------------------ */
 .badge-blob{
   background: linear-gradient(160deg, var(--baby-blue-light), var(--baby-blue));
   border-radius: 32px 32px 32px 8px;
@@ -315,11 +306,25 @@ a{ color: inherit; }
   color: var(--navy);
 }
 
+/* Container-query scaling: each card is its own inline-size container
+   (set on .card above), so this responds to how wide THIS specific card
+   rendered — not the viewport — whether that's because the masonry grid
+   is showing 2 columns on a phone or 4 on a desktop. */
+@container (min-width: 200px){
+  .badge-label{ font-size: 22px; }
+  .badge-date{ font-size: 23px; }
+  .badge-venue{ font-size: 13px; }
+  .badge-script{ font-size: 25px; }
+}
+@container (min-width: 260px){
+  .badge-label{ font-size: 25px; }
+  .badge-date{ font-size: 26px; }
+}
+
 .decorative{ background: transparent; box-shadow:none; padding: 6px; }
 .deco-svg{ width: 100%; height: auto; }
 
-/* ---- RSVP -------------------------------------------------------- */
-.rsvp-section{ margin-top: 12px; }
+.rsvp-section{ margin-top: 12px; max-width: 520px; }
 
 .plaque-rsvp{
   position: relative;
@@ -423,10 +428,6 @@ a{ color: inherit; }
   font-style: italic; font-weight:500; font-size: 24px; color: var(--brass-dark);
 }
 
-/* Chevron that expands the main match's row into a family list: same
-   surname guests appear right underneath as their own toggle rows, so a
-   group arriving together can all be marked without re-searching each
-   name individually. */
 .similar-toggle{
   display:flex; align-items:center; gap:8px; margin-top: 10px;
   width:100%; padding:0; background:none; border:none; cursor:pointer;
@@ -444,8 +445,6 @@ a{ color: inherit; }
 }
 .similar-rows.is-open{ max-height: 2000px; }
 
-/* "Show all" / "Show N more" pagination shown after a batch of relative
-   rows when the full same-surname list is long. */
 .reveal-more{
   display:flex; gap:10px; padding: 12px 0 4px; flex-wrap:wrap;
 }
@@ -461,8 +460,7 @@ a{ color: inherit; }
 
 .switch{ position:relative; width:42px; height:24px; flex:none; }
 .switch input{
-  /* Hit area expanded well beyond the visible track so the tap
-     target meets the 44x44 minimum touch-target guideline. */
+
   position:absolute; top:50%; left:50%; transform: translate(-50%,-50%);
   width:44px; height:44px; opacity:0; margin:0; cursor:pointer;
 }
@@ -535,6 +533,209 @@ a{ color: inherit; }
   transition: background .2s var(--ease);
 }
 .btn-modal-close:hover{ background: rgba(255,255,255,.12); }
+
+/* Shared full-screen overlay chrome — used by both the Entourage and
+   Details overlays (and anything similar added later) so this visual
+   pattern lives in one place instead of being duplicated per feature. */
+.info-overlay{
+  position: fixed; inset: 0; z-index: 90; display: none;
+  background: rgba(10, 18, 32, .6);
+  padding: clamp(16px, 4vw, 40px);
+  overflow-y: auto;
+}
+.info-overlay.is-open{ display: block; }
+
+.info-panel{
+  position: relative;
+  max-width: 640px; margin: 0 auto;
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 30px 60px -18px rgba(6,12,26,.6);
+  /* Lets children (the calendar/countdown below) query the panel's own
+     real width via @container — this genuinely tracks the device, since
+     the panel is ~340-380px on a phone but 640-760px on tablet/desktop,
+     rather than guessing a flat size for everyone. */
+  container-type: inline-size;
+}
+@media (min-width: 900px){ .info-panel{ max-width: 760px; } }
+
+.info-close{
+  position: absolute; top: 16px; right: 16px;
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--blue-100); border: 1px solid var(--baby-blue);
+  display: flex; align-items: center; justify-content: center;
+}
+.info-close:hover{ background: var(--baby-blue-light); }
+
+.info-inner{ padding: clamp(32px, 7vw, 48px) clamp(22px, 6vw, 40px) 40px; }
+
+.info-title{
+  font-family: var(--font-script); font-size: clamp(38px, 9vw, 52px);
+  color: var(--navy); text-align: center; margin: 0 0 30px;
+}
+
+.info-return{
+  display: block; text-align: center; margin-top: 30px;
+  font-family: var(--font-display); font-style: italic; font-size: 14px;
+  color: var(--royal); text-decoration: underline;
+}
+
+.ent-section-heading{
+  font-family: var(--font-script); font-size: clamp(24px, 6vw, 30px);
+  color: var(--navy); text-align: center; margin: 34px 0 18px;
+}
+
+.entourage-grid{
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  margin-bottom: 22px;
+}
+.ent-field-group-full{ grid-column: 1 / -1; }
+
+.ent-field-group{ display: flex; flex-direction: column; gap: 8px; }
+.ent-label{
+  font-family: var(--font-script); font-size: 19px;
+  color: var(--royal); text-align: center; margin: 0 0 2px;
+}
+.ent-pill-group{
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.ent-pill-group > .ent-pill:only-child{ grid-column: 1 / -1; }
+
+.ent-pill-group-single{
+  display: flex;
+  flex-direction: column;
+}
+
+.ent-pill-group-primary > .ent-pill:last-child:nth-child(odd){
+  grid-column: 1 / -1;
+  width: calc(50% - 4px);
+  margin: 0 auto;
+}
+.ent-pill{
+  height: 40px; border-radius: 999px;
+  background: var(--blue-100); border: 1px solid var(--baby-blue);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 14px; text-align: center;
+  font-family: var(--font-display); font-style: italic; font-size: 14px;
+  color: var(--navy); overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------
+   THE DETAILS — schedule/venue timeline, reuses the .info-* overlay
+   chrome above. Built to hold one or several events; each one gets its
+   own marker dot on a connecting vertical line, matching how the
+   reference video lays out ceremony/reception/after-party entries.
+   ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   Calendar + countdown, at the top of The Details overlay — matches
+   the reference video's "save the date" moment before the schedule.
+   ------------------------------------------------------------------ */
+.countdown-block{
+  margin-bottom: 34px; padding-bottom: 30px;
+  border-bottom: 1px dashed var(--baby-blue);
+}
+
+.mini-calendar{ max-width: 340px; margin: 0 auto 28px; }
+.mini-calendar-month{
+  font-family: var(--font-script); font-size: 28px;
+  color: var(--navy); text-align: center; margin: 0 0 14px;
+}
+.mini-calendar-grid{
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 6px; text-align: center;
+}
+.mini-calendar-dow{
+  font-family: var(--font-body); font-size: 12.5px; letter-spacing: .04em;
+  color: var(--blue-mid); padding-bottom: 6px;
+}
+.mini-calendar-day{
+  font-family: var(--font-display); font-size: 17px; color: var(--navy);
+  padding: 10px 0; border-radius: 50%;
+}
+.mini-calendar-day.is-target{
+  background: var(--royal); color: var(--paper); font-weight: 600;
+}
+
+.countdown-timer{
+  display: flex; justify-content: center; gap: clamp(16px, 6vw, 32px);
+}
+.countdown-unit{ display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.countdown-value{
+  font-family: var(--font-display); font-style: italic; font-weight: 600;
+  font-size: clamp(32px, 10vw, 46px); color: var(--brass-dark); line-height: 1;
+}
+.countdown-label{
+  font-family: var(--font-body); font-size: 12.5px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--blue-mid);
+}
+
+/* Grows the calendar/countdown further once the panel itself has real
+   room to give them — true on tablet/desktop where .info-panel renders
+   at 640-760px, not on a phone where it's closer to 340-380px. This
+   responds to the panel's actual measured width (via container-type on
+   .info-panel above), not a guessed viewport breakpoint. */
+@container (min-width: 560px){
+  .mini-calendar{ max-width: 460px; }
+  .mini-calendar-month{ font-size: 36px; margin-bottom: 18px; }
+  .mini-calendar-grid{ gap: 8px; }
+  .mini-calendar-dow{ font-size: 15px; }
+  .mini-calendar-day{ font-size: 22px; padding: 14px 0; }
+  .countdown-timer{ gap: 40px; }
+  .countdown-value{ font-size: 58px; }
+  .countdown-label{ font-size: 14px; }
+}
+
+.detail-timeline{ display: flex; flex-direction: column; }
+
+.detail-event{
+  position: relative;
+  display: flex; gap: 18px;
+  padding-bottom: 30px;
+}
+.detail-event:last-child{ padding-bottom: 0; }
+
+.detail-event-marker{
+  position: relative; flex: none;
+  width: 14px; height: 14px; margin-top: 4px;
+  border-radius: 50%;
+  background: var(--royal); border: 2px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--baby-blue);
+}
+/* Connecting line between markers — omitted after the last event */
+.detail-event:not(:last-child) .detail-event-marker::after{
+  content: ""; position: absolute; top: 16px; left: 50%;
+  width: 1px; height: calc(100% + 26px);
+  transform: translateX(-50%);
+  background: var(--baby-blue);
+}
+
+.detail-event-body{ flex: 1 1 auto; min-width: 0; }
+.detail-event-label{
+  font-family: var(--font-script); font-size: 22px;
+  color: var(--navy); margin: 0 0 4px;
+}
+.detail-event-time{
+  font-family: var(--font-body); font-size: 12.5px; letter-spacing: .04em;
+  color: var(--royal); margin: 0 0 6px;
+}
+.detail-event-venue{
+  font-family: var(--font-display); font-style: italic; font-size: 19px;
+  color: var(--navy); margin: 0 0 2px;
+}
+.detail-event-address{
+  font-size: 12.5px; color: var(--blue-mid); margin: 0 0 10px;
+}
+.detail-event-map{
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body); font-size: 12px; letter-spacing: .03em;
+  color: var(--royal); text-decoration: underline;
+}
+
+@media (max-width: 400px){
+  .entourage-grid{ grid-template-columns: 1fr; }
+}
 
 @media (prefers-reduced-motion: reduce){
   .hero, .board, #foldLines, #sealGroup, .reveal-section, .rsvp-panel, .switch .thumb, .switch .track{ transition:none; }
