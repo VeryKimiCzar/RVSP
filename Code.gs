@@ -39,7 +39,14 @@ function getSheet() {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
 }
 
+const GUEST_CACHE_KEY = "guest_rows_cache_v1";
+const GUEST_CACHE_TTL_SECONDS = 30;
+
 function getAllGuestRows() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(GUEST_CACHE_KEY);
+  if (cached) return JSON.parse(cached);
+
   const rows = getSheet().getDataRange().getValues();
   const guests = [];
   for (let i = 1; i < rows.length; i++) {
@@ -47,7 +54,13 @@ function getAllGuestRows() {
     if (!id) continue;
     guests.push({ id: id, name: rows[i][1], status: rows[i][2] || "Pending" });
   }
+
+  cache.put(GUEST_CACHE_KEY, JSON.stringify(guests), GUEST_CACHE_TTL_SECONDS);
   return guests;
+}
+
+function invalidateGuestCache() {
+  CacheService.getScriptCache().remove(GUEST_CACHE_KEY);
 }
 
 const NAME_SUFFIXES = ["jr", "sr", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii"];
@@ -111,6 +124,7 @@ function updateRsvp(id, name, status) {
       sheet.getRange(rowNum, 3).setValue(status);
       sheet.getRange(rowNum, 4).setValue(new Date());
       cache.put(cooldownKey, "1", RSVP_COOLDOWN_SECONDS);
+      invalidateGuestCache();
       return { ok: true, id: id, status: status };
     }
   }
@@ -118,7 +132,14 @@ function updateRsvp(id, name, status) {
   return { ok: false, error: "Guest not found" };
 }
 
+const ENTOURAGE_CACHE_KEY = "entourage_cache_v1";
+const ENTOURAGE_CACHE_TTL_SECONDS = 300;
+
 function listEntourage() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(ENTOURAGE_CACHE_KEY);
+  if (cached) return { ok: true, entourage: JSON.parse(cached) };
+
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(ENTOURAGE_SHEET_NAME);
   if (!sheet) return { ok: true, entourage: [] };
 
@@ -137,6 +158,7 @@ function listEntourage() {
   }
 
   entourage.sort((a, b) => a.order - b.order);
+  cache.put(ENTOURAGE_CACHE_KEY, JSON.stringify(entourage), ENTOURAGE_CACHE_TTL_SECONDS);
   return { ok: true, entourage: entourage };
 }
 

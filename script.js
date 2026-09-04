@@ -1,14 +1,8 @@
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby7M2CM-wCFw-ZcLeiBIB2A3v74MFKrZdPO24kvgEvUL8HvQrPcYpd--HFw75ei82CQqQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxr_RAl4cYYbmkKhBMQ0jTdFhAfkopi_kwzyDHOElHUGZOJITwMgDCyOE6DRMRv3LCu4w/exec";
 
-const REVEAL_BATCH_SIZE = 5;
-
-const NAME_SUFFIXES = new Set(["jr", "sr", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii"]);
+const MIN_SEARCH_LENGTH = 4;
 
 let currentGuest = null;
-let currentSimilar = [];
-let revealedCount = 0;
-let touchedIds = new Set();
-const rowInputs = new Map();
 
 async function submitRSVP(guest, status){
   if(!APPS_SCRIPT_URL){
@@ -25,31 +19,26 @@ async function submitRSVP(guest, status){
   }
 }
 
-function parseName(fullName){
-  const parts = fullName.trim().split(/\s+/);
-  if(parts.length === 1) return { first: parts[0], last: parts[0], suffix: "" };
-
-  const lastToken = parts[parts.length - 1];
-  const isSuffix = NAME_SUFFIXES.has(lastToken.replace(/\.$/, "").toLowerCase());
-
-  return isSuffix && parts.length > 2
-    ? { first: parts.slice(0, -2).join(" "), last: parts[parts.length - 2], suffix: lastToken }
-    : { first: parts.slice(0, -1).join(" "), last: lastToken, suffix: "" };
-}
-
-const surnameOf = fullName => parseName(fullName).last.toLowerCase();
 const titleCase = str => str.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 
+function meetsSearchThreshold(trimmedValue){
+  if(trimmedValue.length >= MIN_SEARCH_LENGTH) return true;
+  // Under the minimum: only search if the first word already looks
+  // finished — the guest has typed into a second word (e.g. "Al Reyes").
+  // A short name typed alone (e.g. just "Al") still searches on Enter.
+  return /\s/.test(trimmedValue);
+}
+
 async function findGuest(query){
-  if(!APPS_SCRIPT_URL) return { match: null, similar: [], error: true };
+  if(!APPS_SCRIPT_URL) return { match: null, error: true };
 
   try{
     const url = `${APPS_SCRIPT_URL}?action=search&q=${encodeURIComponent(query)}`;
     const data = await (await fetch(url)).json();
-    if(data.ok) return { match: data.match, similar: data.similar || [], error: false };
-    return { match: null, similar: [], error: true };
+    if(data.ok) return { match: data.match, error: false };
+    return { match: null, error: true };
   }catch(err){
-    return { match: null, similar: [], error: true };
+    return { match: null, error: true };
   }
 }
 
@@ -69,10 +58,6 @@ const attendToggle = document.getElementById("attendToggle");
 const attendLabel = document.getElementById("attendLabel");
 const confirmBtn = document.getElementById("confirmBtn");
 const confirmStatus = document.getElementById("confirmStatus");
-
-const similarToggle = document.getElementById("similarToggle");
-const similarSurnameEl = document.getElementById("similarSurname");
-const similarRows = document.getElementById("similarRows");
 
 const thankYouOverlay = document.getElementById("thankYouOverlay");
 const thankYouMessage = document.getElementById("thankYouMessage");
@@ -138,23 +123,31 @@ nameInput.addEventListener("keydown", (e) => {
   if(e.key !== "Enter") return;
   e.preventDefault();
   clearTimeout(debounceTimer);
-  handleLookup(nameInput.value);
+  handleLookup(nameInput.value, { force: true });
 });
 
 let lookupRequestId = 0;
 
-async function handleLookup(value){
+async function handleLookup(value, { force = false } = {}){
   const trimmed = value.trim();
   const requestId = ++lookupRequestId;
 
   if(!trimmed){
     lookupStatus.textContent = "";
     closeSection(inviteSection); closeSection(confirmSection);
-    resetSimilar();
     return;
   }
 
-  const { match, similar, error } = await findGuest(trimmed);
+  if(!force && !meetsSearchThreshold(trimmed)){
+    lookupStatus.textContent = "";
+    closeSection(inviteSection); closeSection(confirmSection);
+    return;
+  }
+
+  lookupStatus.classList.remove("is-error");
+  lookupStatus.innerHTML = '<span class="dot"></span> Searching…';
+
+  const { match, error } = await findGuest(trimmed);
   if(requestId !== lookupRequestId) return;
   currentGuest = match;
 
@@ -162,7 +155,6 @@ async function handleLookup(value){
     lookupStatus.classList.add("is-error");
     lookupStatus.innerHTML = '<span class="dot"></span> We couldn\'t connect to the server. Please try again in a moment.';
     closeSection(inviteSection); closeSection(confirmSection);
-    resetSimilar();
     return;
   }
 
@@ -170,13 +162,11 @@ async function handleLookup(value){
     lookupStatus.classList.remove("is-error");
     lookupStatus.innerHTML = `<span class="dot"></span> Invitation found — welcome, ${titleCase(match.name)}.`;
     populateInvite(match);
-    populateSimilar(match, similar);
     openSection(inviteSection); openSection(confirmSection);
   } else {
     lookupStatus.classList.add("is-error");
     lookupStatus.innerHTML = '<span class="dot"></span> We couldn\'t find that name. Please check the spelling or contact us directly.';
     closeSection(inviteSection); closeSection(confirmSection);
-    resetSimilar();
   }
 }
 
@@ -196,95 +186,6 @@ function setAttendLabel(labelEl, isAttending){
 
 attendToggle.addEventListener("change", () => setAttendLabel(attendLabel, attendToggle.checked));
 
-function resetSimilar(){
-  currentSimilar = [];
-  revealedCount = 0;
-  touchedIds = new Set();
-  rowInputs.clear();
-  similarRows.innerHTML = "";
-  similarRows.classList.remove("is-open");
-  similarToggle.setAttribute("aria-expanded", "false");
-  similarToggle.hidden = true;
-}
-
-function populateSimilar(match, similar){
-  resetSimilar();
-  if(!similar.length) return;
-
-  currentSimilar = similar;
-  similarSurnameEl.textContent = titleCase(surnameOf(match.name));
-  similarToggle.hidden = false;
-}
-
-function buildPersonRow(guest){
-  const isAttending = guest.status === "Attending";
-
-  const row = document.createElement("div");
-  row.className = "person-row";
-  row.innerHTML = `
-    <span class="person-name">${guest.name}</span>
-    <div class="member-control">
-      <label class="switch">
-        <input type="checkbox" aria-label="${guest.name} attending" ${isAttending ? "checked" : ""}>
-        <span class="track"></span>
-        <span class="thumb"></span>
-      </label>
-      <span class="switch-label${isAttending ? " is-accept" : ""}">${isAttending ? "Joyfully accepts" : "Regretfully declines"}</span>
-    </div>
-  `;
-
-  const input = row.querySelector("input");
-  const labelText = row.querySelector(".switch-label");
-  input.addEventListener("change", () => {
-    setAttendLabel(labelText, input.checked);
-    touchedIds.add(guest.id);
-  });
-
-  rowInputs.set(guest.id, input);
-  return row;
-}
-
-function renderSimilarRows(){
-  similarRows.innerHTML = "";
-  currentSimilar.slice(0, revealedCount).forEach(g => similarRows.appendChild(buildPersonRow(g)));
-
-  const remaining = currentSimilar.length - revealedCount;
-  if(remaining <= 0) return;
-
-  const controls = document.createElement("div");
-  controls.className = "reveal-more";
-
-  const revealMore = (count) => { revealedCount = Math.min(revealedCount + count, currentSimilar.length); renderSimilarRows(); };
-
-  const showAllBtn = document.createElement("button");
-  showAllBtn.type = "button";
-  showAllBtn.textContent = "Show all";
-  showAllBtn.addEventListener("click", () => revealMore(currentSimilar.length));
-  controls.appendChild(showAllBtn);
-
-  if(remaining > REVEAL_BATCH_SIZE){
-    const showMoreBtn = document.createElement("button");
-    showMoreBtn.type = "button";
-    showMoreBtn.textContent = `Show ${REVEAL_BATCH_SIZE} more`;
-    showMoreBtn.addEventListener("click", () => revealMore(REVEAL_BATCH_SIZE));
-    controls.appendChild(showMoreBtn);
-  }
-
-  similarRows.appendChild(controls);
-}
-
-similarToggle.addEventListener("click", () => {
-  const opening = !similarRows.classList.contains("is-open");
-
-  if(opening && revealedCount === 0 && currentSimilar.length){
-    if(currentSimilar.length <= REVEAL_BATCH_SIZE) revealedCount = currentSimilar.length;
-    renderSimilarRows();
-  }
-
-  similarRows.classList.toggle("is-open", opening);
-  similarToggle.setAttribute("aria-expanded", String(opening));
-});
-
 confirmBtn.addEventListener("click", async () => {
   if(!currentGuest) return;
   confirmBtn.disabled = true;
@@ -292,35 +193,25 @@ confirmBtn.addEventListener("click", async () => {
   confirmStatus.textContent = "";
   confirmStatus.classList.remove("is-error");
 
-  const submissions = [{ guest: currentGuest, accepted: attendToggle.checked }];
-  touchedIds.forEach(id => {
-    const guest = currentSimilar.find(g => g.id === id);
-    const input = rowInputs.get(id);
-    if(guest && input) submissions.push({ guest, accepted: input.checked });
-  });
-
-  const results = [];
-  for(const { guest, accepted } of submissions){
-    results.push(await submitRSVP(guest, accepted ? "Attending" : "Declined"));
-  }
+  const accepted = attendToggle.checked;
+  const result = await submitRSVP(currentGuest, accepted ? "Attending" : "Declined");
 
   confirmBtn.disabled = false;
   confirmBtn.textContent = "Confirm response";
 
-  if(results.some(r => !r.ok)){
+  if(!result.ok){
     confirmStatus.classList.add("is-error");
     confirmStatus.innerHTML = '<span class="dot"></span> We couldn\'t reach the server. Please try again in a moment.';
     return;
   }
 
-  showThankYou(submissions);
+  showThankYou(accepted);
 });
 
-function showThankYou(submissions){
-  const allDeclined = submissions.every(s => !s.accepted);
-  const sentiment = allDeclined
-    ? "We'll miss you, but thank you for letting us know."
-    : "We can't wait to celebrate with you!";
+function showThankYou(accepted){
+  const sentiment = accepted
+    ? "We can't wait to celebrate with you!"
+    : "We'll miss you, but thank you for letting us know.";
 
   thankYouMessage.textContent = `Your response has been received. ${sentiment}`;
   thankYouOverlay.classList.add("is-open");
@@ -397,9 +288,15 @@ function renderEntourage(entries){
 }
 
 entourageOpen.addEventListener("click", () => {
+  musicHint.classList.add("is-hidden");
   entourageOverlay.classList.add("is-open");
   loadEntourage();
 });
+
+// Quietly warm this up in the background while the guest is still on the
+// envelope/board, so by the time they tap into the entourage overlay the
+// data (and the Apps Script backend) is usually already ready to go.
+loadEntourage();
 entourageClose.addEventListener("click", () => {
   entourageOverlay.classList.remove("is-open");
 });
@@ -469,6 +366,7 @@ function updateCountdown(){
 buildCalendar(); // static — only needs to run once
 
 detailsOpen.addEventListener("click", () => {
+  musicHint.classList.add("is-hidden");
   detailsOverlay.classList.add("is-open");
   if(!countdownInterval){
     updateCountdown();

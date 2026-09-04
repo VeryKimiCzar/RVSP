@@ -194,6 +194,46 @@ The page revealed after unsealing the envelope, and the "Entourage" sub-page wit
     "search by name" Google Maps URLs to the exact `maps.app.goo.gl` share
     links provided for each venue — more reliable than a name search, which
     can occasionally land on a same-named place elsewhere.
+- **Title plaque had two small but visible bugs, fixed together**: `.plaque-title`
+  never actually had `text-align: center` set (every other card on the board does,
+  via the shared `.card` class, but the title plaque uses its own `.plaque`/
+  `.plaque-title` classes which never picked that up) — so the flourishes, the
+  "Join us for the wedding of" line, and the "Arvin & Precious" names were all
+  quietly defaulting to left-aligned instead of centered inside the plaque. At the
+  same time, "Join us" had been split into its own `.eyebrow-emphasis` span sized
+  at 1.6em while the rest of the line ("for the wedding of") sat at a much smaller
+  11px, which read as an odd, unintentional-looking size mismatch rather than a
+  clean "slightly bigger" eyebrow line. Fixed both: added `text-align: center` to
+  `.plaque-title`, dropped the split-emphasis span, and bumped the whole eyebrow
+  line uniformly to 13px instead.
+  - **Reinstated shortly after**: the uniform-size version wasn't actually wanted —
+    "Join us" is back to standing out via `.eyebrow-emphasis` at 1.6em, now sitting
+    correctly centered since the `.plaque-title` fix above already covers it.
+- **Two compounding entourage-overlay layout bugs, found from real device
+  screenshots (iPhone + Samsung) rather than guessed from code**:
+  - A `@media (max-width: 400px)` rule was collapsing `.entourage-grid` down to a
+    single column on narrow phones — meaning every paired role (Bridesmaids/
+    Groomsmen, Best Man/Maid of Honor, Parents of the Groom/Bride, etc.) stacked
+    vertically instead of sitting side-by-side, which defeats the point of pairing
+    them at all. Removed the override; the two-column layout is now unconditional.
+  - Separately, roles that can hold more than one person (Veil, Cord, Candle,
+    Bible/Coin/Ring Bearer) had `.ent-pill-group` set to its own internal
+    `repeat(2, 1fr)` grid — meaning a role already sitting in a half-width outer
+    column was being quartered again inside that half, on top of removing the
+    mobile-collapse above this made already-tight columns even tighter. That's
+    what was fracturing names mid-word ("Crispo" / "nde" on separate lines) in the
+    Samsung screenshot. `.ent-pill-group` now stacks its pills in a single column
+    by default — matching what Bridesmaids/Groomsmen already did via the (now-
+    redundant and removed) `.ent-pill-group-single` modifier — while Primary
+    Principal keeps its own explicit 2-column grid via `.ent-pill-group-primary`,
+    since that section spans the *full* overlay width rather than a quartered half
+    and was always meant to show sponsor pairs 2-across.
+  - Also noticed in the Samsung screenshot: the "Tap for music" hint bubble was
+    rendering on top of the entourage overlay (it sits at `z-index: 200`, above the
+    overlay's `z-index: 90`), obscuring the "Parents of the Bride" heading. The
+    hint already dismissed itself on its own tap; it now also dismisses the moment
+    either the Entourage or Details overlay opens, so it can't float over content
+    the guest hasn't interacted with it to trigger.
 
 ---
 
@@ -315,6 +355,23 @@ safely stored underneath.)
     public, login-free "search your own name" pattern. What changed is the *cost*:
     one click to dump everyone, versus a slow, rate-limited, one-name-at-a-time grind.
 
+- **Latency fix — RSVP search and Entourage overlay both felt like a "few seconds"
+  in a bad way.** Root cause was `Code.gs` re-reading the whole Sheet from scratch on
+  every single request, with no feedback shown client-side while that happens. Fixed
+  both ends:
+  - `Code.gs`: `getAllGuestRows()` and `listEntourage()` now cache their results in
+    `CacheService` (guest rows: 30s TTL; entourage: 300s TTL, since it changes far less
+    often). `updateRsvp()` explicitly invalidates the guest cache on a successful write
+    so a guest's own RSVP shows up immediately rather than waiting out the TTL.
+  - `script.js`: `handleLookup()` now shows a "Searching…" status the instant a lookup
+    starts, instead of leaving the status blank during the network round trip.
+    `loadEntourage()` is now also fired once in the background right after the page
+    loads (in addition to its existing on-click call, which it still guards against
+    double-fetching) — the goal is that by the time someone actually taps into the
+    entourage overlay, the data is usually already sitting there ready, and the
+    Apps Script backend has had a chance to shake off any cold-start delay before
+    they notice it.
+
 ---
 
 ## Accessibility & Design System
@@ -350,6 +407,35 @@ card, title plaque, and entourage panel each kept their own tighter width caps
 (520px, 640px, 640→760px) so they scale up modestly without turning into
 oversized, awkward-to-read forms — only the actual showcase/collage content
 stretches to fill the extra space.
+
+**"Join us" emphasized in the title plaque.** The eyebrow line above the couple's
+names ("Join us for the wedding of") now wraps "Join us" in its own span
+(`.eyebrow-emphasis`) sized larger (1.6em) than the rest of the eyebrow text,
+so it reads as the lead-in phrase rather than being uniform with "for the
+wedding of".
+
+**"Others named ___" similar-guests feature removed from RSVP search**, along
+with all its supporting code: the toggle button and expandable row list in
+`index.html`, the `.similar-toggle`/`.similar-rows`/`.reveal-more` CSS, and
+`script.js`'s `parseName`/`surnameOf` helpers, `populateSimilar`/`resetSimilar`/
+`buildPersonRow`/`renderSimilarRows`, and the extra-submissions logic in the
+confirm handler (`touchedIds`/`rowInputs`). `findGuest`/`handleLookup` now only
+track the single matched guest; confirming submits just that one RSVP.
+`Code.gs`'s `searchGuests` still computes and returns a `similar` list — left
+alone since nothing asked for a backend change, and the frontend now simply
+ignores that field.
+
+**Minimum search-length guard added** (closing the item that had been flagged
+but not yet implemented): a debounced/typed lookup now only fires once the
+query is 4+ characters, unless the input already contains more than one word
+(e.g. "Al Reyes"), where the first name is clearly finished even though it's
+short. A bare short name typed alone (e.g. just "Al", with no last name) won't
+auto-search until the guest presses Enter — pressing Enter always searches
+immediately regardless of length, since that's an explicit, unambiguous
+signal that the input is complete. There's no way to know client-side that a
+short typed name is actually a guest's *complete* first name rather than a
+first few letters of a longer one, so this is a heuristic based on visible
+typing signals, not a guarantee.
 
 **Followed up with CSS Container Queries instead of adopting a framework.**
 You asked whether something better than Bootstrap exists for responsive design —
@@ -422,5 +508,4 @@ error message instead of silently using placeholder data.
   `Parents of the Bride`, `Primary Principal`, `Best Man`, `Maid of Honor`,
   `Veil`, `Cord`, `Candle`, `Bible Bearer`, `Coin Bearer`, `Ring Bearer`,
   `Bridesmaid`, `Groomsman`)
-- A minimum search-length guard on RSVP name search (flagged, not yet added)
 - Gallery, countdown, and other "final website" sections (original Phase 5 scope)
