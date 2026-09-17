@@ -78,6 +78,7 @@ const musicDisc = document.getElementById("musicDisc");
 const musicHint = document.getElementById("musicHint");
 const bgMusic = document.getElementById("bgMusic");
 
+
 document.getElementById("openBtn").addEventListener("click", () => {
   envelopeWrap.classList.add("is-unsealed");
   setTimeout(() => hero.classList.add("is-leaving"), 400);
@@ -222,14 +223,20 @@ closeThankYouBtn.addEventListener("click", () => {
 });
 
 const ENTOURAGE_ROLE_MAP = {
+  "parents of the groom": "entParentsGroom",
+  "parents of the bride": "entParentsBride",
   "primary principal": "entPrimaryPrincipal",
   "best man": "entBestMan",
   "maid of honor": "entMaidOfHonor",
   "veil": "entVeil",
   "cord": "entCord",
   "candle": "entCandle",
+  "groomsman": "entGroomsmen",
   "bridesmaid": "entBridesmaids",
-  "groomsman": "entGroomsmen"
+  "ring bearer": "entRingBearer",
+  "coin bearer": "entCoinBearer",
+  "bible bearer": "entBibleBearer",
+  "flower girl": "entFlowerGirls"
 };
 
 let entourageLoaded = false;
@@ -291,6 +298,7 @@ entourageOpen.addEventListener("click", () => {
   musicHint.classList.add("is-hidden");
   entourageOverlay.classList.add("is-open");
   loadEntourage();
+  window.location.hash = 'entourage';
 });
 
 // Quietly warm this up in the background while the guest is still on the
@@ -299,10 +307,12 @@ entourageOpen.addEventListener("click", () => {
 loadEntourage();
 entourageClose.addEventListener("click", () => {
   entourageOverlay.classList.remove("is-open");
+  window.location.hash = '';
 });
 entourageReturn.addEventListener("click", (e) => {
   e.preventDefault();
   entourageOverlay.classList.remove("is-open");
+  window.location.hash = '';
 });
 
 // Ceremony start time — also the countdown's target and the day the
@@ -372,15 +382,134 @@ detailsOpen.addEventListener("click", () => {
     updateCountdown();
     countdownInterval = setInterval(updateCountdown, 1000);
   }
+  window.location.hash = 'details';
 });
 detailsClose.addEventListener("click", () => {
   detailsOverlay.classList.remove("is-open");
   clearInterval(countdownInterval);
   countdownInterval = null;
+  window.location.hash = '';
 });
 detailsReturn.addEventListener("click", (e) => {
   e.preventDefault();
   detailsOverlay.classList.remove("is-open");
   clearInterval(countdownInterval);
   countdownInterval = null;
+  window.location.hash = '';
 });
+
+// Image functionality for details timeline - click to enlarge
+let currentImageOverlay = null;
+
+// Image URLs for venues (you would replace these with actual image URLs)
+const venueImages = {
+  "Our Lady of the Assumption Parish": "https://via.placeholder.com/400x300?text=Our+Lady+of+the+Assumption+Parish",
+  "Socorro's The Venue": "https://via.placeholder.com/400x300?text=Socorro%27s+The+Venue"
+};
+
+// Handle clicks on "View on map" links in the details timeline
+document.addEventListener("click", (e) => {
+  const mapLink = e.target.closest(".detail-event-map");
+  if (mapLink) {
+    e.preventDefault();
+
+    // Remove any existing image overlay
+    if (currentImageOverlay) {
+      currentImageOverlay.remove();
+      currentImageOverlay = null;
+    }
+
+    // Get the venue name from the event
+    const detailEvent = mapLink.closest(".detail-event");
+    if (!detailEvent) return; // Safety check
+
+    const venueElement = detailEvent.querySelector(".detail-event-venue");
+    const venueName = venueElement ? venueElement.textContent.trim() : "";
+
+    // Use a fallback venue name if empty
+    const finalVenueName = venueName || "Venue Location";
+
+    // Get image URL for the venue (use fallback if not found)
+    const imageUrl = venueImages[finalVenueName] || "https://via.placeholder.com/400x300?text=Venue+Location";
+
+    // Create image overlay container
+    const imageOverlay = document.createElement("div");
+    imageOverlay.className = "image-overlay";
+    imageOverlay.innerHTML = `
+      <div class="image-overlay-content">
+        <img src="${imageUrl}" alt="${finalVenueName}" class="enlargeable-image">
+        <button class="image-close-btn">×</button>
+      </div>
+    `;
+
+    // Insert the overlay after the clicked link
+    mapLink.parentNode.insertBefore(imageOverlay, mapLink.nextSibling);
+
+    // Keep reference to current overlay
+    currentImageOverlay = imageOverlay;
+
+    // Add event listeners for closing the overlay
+    const closeBtn = imageOverlay.querySelector(".image-close-btn");
+    const overlayContent = imageOverlay.querySelector(".image-overlay-content");
+
+    closeBtn.addEventListener("click", () => {
+      imageOverlay.remove();
+      currentImageOverlay = null;
+    });
+
+    // Close when clicking outside the image content
+    imageOverlay.addEventListener("click", (clickEvent) => {
+      if (clickEvent.target === imageOverlay) {
+        imageOverlay.remove();
+        currentImageOverlay = null;
+      }
+    });
+  }
+});
+
+// Close entourage overlay when clicking outside the panel
+entourageOverlay.addEventListener("click", (e) => {
+  if (e.target === entourageOverlay) {
+    entourageOverlay.classList.remove("is-open");
+    window.location.hash = '';
+  }
+});
+
+// Close details overlay when clicking outside the panel
+detailsOverlay.addEventListener("click", (e) => {
+  if (e.target === detailsOverlay) {
+    detailsOverlay.classList.remove("is-open");
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+    window.location.hash = '';
+  }
+});
+
+// Check URL hash on page load to determine which overlay to open
+function checkUrlHashOnLoad() {
+  const hash = window.location.hash.substring(1); // Remove the '#'
+
+  if (hash === 'entourage' || hash === 'details') {
+    // Show the main board (skip envelope animation)
+    if (hero) hero.style.display = "none";
+    if (board) board.classList.add("visible");
+
+    // Also hide the envelope wrap just in case
+    if (envelopeWrap) envelopeWrap.classList.remove("is-unsealed");
+    if (hero) hero.classList.remove("is-leaving");
+  }
+
+  if (hash === 'entourage') {
+    if (entourageOverlay) entourageOverlay.classList.add('is-open');
+    loadEntourage();
+  } else if (hash === 'details') {
+    if (detailsOverlay) detailsOverlay.classList.add('is-open');
+    if (!countdownInterval) {
+      updateCountdown();
+      countdownInterval = setInterval(updateCountdown, 1000);
+    }
+  }
+}
+
+// Run the hash check on page load with a small delay to ensure DOM is ready
+setTimeout(checkUrlHashOnLoad, 50);

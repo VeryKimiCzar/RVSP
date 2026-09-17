@@ -234,6 +234,48 @@ The page revealed after unsealing the envelope, and the "Entourage" sub-page wit
     hint already dismissed itself on its own tap; it now also dismisses the moment
     either the Entourage or Details overlay opens, so it can't float over content
     the guest hasn't interacted with it to trigger.
+  - **Follow-up**: hiding the hint text wasn't enough — the music disc *button*
+    itself was still `z-index: 200`, above every overlay (`.info-overlay` at 90,
+    `.thankYouOverlay` at 100), and it sits at the exact same fixed `top:16px;
+    right:16px` corner where `.info-close` renders. On phones, where the panel is
+    close to full width, that put the disc directly on top of the close button,
+    blocking taps on it. Dropped both `.music-disc` and `.music-hint` to
+    `z-index: 50` — below every overlay — so opening Details, Entourage, or the
+    Thank You screen now correctly covers the disc instead of floating above it.
+- **Entourage reordered to match a reference template the couple shared** (a
+  "Sage Green Wedding Invitation" layout). New order: Parents of the Groom/Bride
+  → **Principal Sponsor** (moved earlier, above Best Man/Maid of Honor — it used
+  to come after) → Best Man/Maid of Honor → **Secondary Sponsors** (renamed from
+  "Secondary Principal" to match the template's heading): Candle/Veil paired
+  (was Veil/Cord before) → Cord on its own full-width row → Groomsmen/Bridesmaids
+  (order flipped — Groomsmen now left, Bridesmaids right) → Ring Bearer/Coin
+  Bearer (order flipped to Ring-then-Coin) → Bible Bearer on its own full-width
+  row → **Flower Girls, a brand new role** (2-column grid like Primary Principal,
+  since the template shows 4 names in a 2×2 layout). Added a small italic
+  `.ent-tagline` caption above each secondary-sponsor role/pair ("To light our
+  path", "To clothe us as one", "To bind us together", "To guide us in our way",
+  "To carry our symbol of Love, Treasure and Faith") to match the template's
+  captions, styled to fit the site's own look rather than copying the template's
+  fonts/colors directly.
+  - **Found and fixed while doing this**: `ENTOURAGE_ROLE_MAP` in `script.js` was
+    missing entries for Parents of the Groom, Parents of the Bride, Coin Bearer,
+    Ring Bearer, and Bible Bearer — those five containers have existed in the HTML
+    for a while, but with no matching map entry, anyone entered under those exact
+    role names in the Entourage sheet tab would silently fail to render. All five
+    are now mapped, alongside the new `"flower girl"` entry.
+  - To use the new Flower Girls section, add rows to the **Entourage** sheet tab
+    with role exactly `Flower Girl` (case-insensitive), same as any other role.
+  - **Follow-up**: Parents of the Groom/Bride were still side-by-side as two
+    columns. Changed to stack vertically instead — Groom's parents on top,
+    Bride's parents below — each now taking the full width and using the same
+    2-column pill treatment as Primary Principal, so Father/Mother still sit
+    next to each other within their own row once names are entered.
+
+- **Fixed entourage ordering and styling**: Reordered Ring Bearer, Coin Bearer, Bible Bearer, and Flower Girls to appear before Groomsmen and Bridesmen as requested. Added missing `.ent-tagline` elements for Bible Bearer ("To carry the Word of God") and Flower Girls ("To scatter blessings along our path") to ensure proper visual consistency with the existing entourage section styling.
+- **Fixed Principal Sponsor ent-label**: Added missing ent-label element for Principal Sponsor section to maintain consistent entourage section structure (ent-tagline + ent-label + container pattern).
+- **Replaced map functionality with click-to-enlarge images**: Removed OpenStreetMap iframe implementation and replaced with static images that enlarge when clicked, providing a simpler, more reliable venue visualization approach.
+- **Enhanced click-outside-to-close behavior**: Overlays (entourage, details, thank you) and image enlargements now close when clicking outside their boundaries, in addition to the existing close buttons and return links.
+- **Fixed URL hash state preservation**: Corrected timing issues in the URL hash system to ensure proper overlay state preservation through page refreshes using URL hashtags (#entourage, #details). When refreshing from an overlay view, users now see the main board content immediately (skipping the envelope animation) rather than returning to the initial envelope/letter view.
 
 ---
 

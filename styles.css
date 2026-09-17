@@ -33,7 +33,7 @@ button:focus-visible{ outline: 2px solid #fff; outline-offset: 3px; }
 a{ color: inherit; }
 
 .music-disc{
-  position: fixed; top: 16px; right: 16px; z-index: 200;
+  position: fixed; top: 16px; right: 16px; z-index: 50;
   width: 44px; height: 44px; padding: 0; border: none;
   background: none; cursor: pointer; border-radius: 50%;
 }
@@ -59,7 +59,7 @@ a{ color: inherit; }
 
 .music-hint{
   position: fixed; top: 38px; right: 68px; transform: translateY(-50%);
-  z-index: 200; margin: 0; white-space: nowrap;
+  z-index: 50; margin: 0; white-space: nowrap;
   background: var(--navy); color: var(--paper);
   font-family: var(--font-body); font-size: 11px; letter-spacing: .04em;
   padding: 7px 14px; border-radius: 999px;
@@ -558,6 +558,10 @@ a{ color: inherit; }
   font-family: var(--font-script); font-size: clamp(24px, 6vw, 30px);
   color: var(--navy); text-align: center; margin: 34px 0 18px;
 }
+.ent-tagline{
+  font-family: var(--font-display); font-style: italic; font-size: 13px;
+  color: var(--blue-mid); text-align: center; margin: 0 0 8px;
+}
 
 .entourage-grid{
   display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
@@ -706,6 +710,123 @@ a{ color: inherit; }
   color: var(--royal); text-decoration: underline;
 }
 
+/* Inline map container for details timeline */
+.detail-map-container{
+  margin: 16px 0;
+  border-radius: 18px;
+  box-shadow: 0 14px 28px -12px rgba(6,12,26,.45);
+  overflow: hidden;
+}
+.detail-map-container iframe{
+  width: 100%;
+  height: 240px; /* Fixed height for consistency */
+  border: none;
+  display: block;
+}
+
+/* Map container styles for details overlay */
+.map-container{
+  background: var(--paper);
+  border-radius: 18px;
+  box-shadow: 0 20px 40px -18px rgba(6,12,26,.5);
+  overflow: hidden;
+}
+.map-header{
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px; border-bottom: 1px dashed var(--baby-blue);
+  background: var(--blue-100);
+}
+.map-close{
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--blue-100); border: 1px solid var(--baby-blue);
+  display: flex; align-items: center; justify-content: center;
+}
+.map-close:hover{ background: var(--baby-blue-light); }
+.map-title{
+  margin: 0; font-family: var(--font-display); font-size: 20px;
+  color: var(--navy); text-align: center;
+}
+.map-content{
+  position: relative; width: 100%; height: 0; padding-bottom: 56.25%; /* 16:9 aspect ratio */
+}
+.map-content iframe{
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  border: none;
+}
+
 @media (prefers-reduced-motion: reduce){
   .hero, .board, #foldLines, #sealGroup, .reveal-section, .rsvp-panel, .switch .thumb, .switch .track{ transition:none; }
+}
+
+/* Map Popup Styles */
+.map-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.map-popup-content {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 14px 28px -12px rgba(6,12,26,.45);
+  overflow: hidden;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-popup-header {
+  background: var(--navy);
+  color: white;
+  padding: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.map-popup-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-family: var(--font-display);
+}
+
+.map-popup-close {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.map-popup-close:hover {
+  background-color: rgba(255,255,255,0.2);
+}
+
+.map-popup-body {
+  flex: 1;
+  padding: 0;
+  position: relative;
+}
+
+.map-popup-body iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
