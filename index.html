@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arvin &amp; Precious</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<button class="music-disc is-muted" id="musicDisc" type="button" aria-label="Play background music" aria-pressed="true">
+  <svg class="disc-art" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="30" cy="30" r="28" fill="#16274a" stroke="#f3f7fb" stroke-width="1.5"/>
+    <circle cx="30" cy="30" r="20" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
+    <circle cx="30" cy="30" r="14" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1"/>
+    <circle cx="30" cy="30" r="6" fill="#b3925c"/>
+    <circle cx="30" cy="30" r="2" fill="#16274a"/>
+  </svg>
+  <svg class="play-icon" viewBox="0 0 24 24" width="16" height="16" fill="#f3f7fb" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+</button>
+<p class="music-hint" id="musicHint">Tap for music</p>
+<audio id="bgMusic" loop preload="auto">
+  <source src="assets/bgm.mp3" type="audio/mpeg">
+</audio>
+
+<main class="stage" id="stage">
+  <p class="invite-heading">You&rsquo;re Invited</p>
+  <p class="invite-date">12 . 08 . 2026</p>
+
+  <div class="envelope-wrap" id="envelopeWrap">
+    <img class="envelope" src="assets/photos/envelope/envelope.png" width="1097" height="692" alt="Wedding invitation envelope">
+    <p class="unseal-caption">Click the envelope to open</p>
+    <button class="envelope-hit" id="openBtn" type="button" aria-label="Open the invitation"></button>
+  </div>
+
+  <section class="countdown" id="countdown" aria-hidden="true">
+    <div class="cd-bg"></div>
+    <div class="cd-frame">
+      <img class="cd-flap" src="assets/photos/countdown/flap.png" width="952" height="933" alt="">
+      <img class="cd-content" src="assets/photos/countdown/content.png" width="784" height="736" alt="Together with our families, Arvin and Precious invite you to join in the celebration of our marriage">
+      <img class="cd-base" src="assets/photos/countdown/base.png" width="1106" height="949" alt="">
+      <p class="cd-title">Counting days until we say &ldquo;I do&rdquo;</p>
+      <div class="cd-grid" role="timer" aria-label="Countdown to December 8, 2026">
+        <div class="cd-unit"><span class="cd-num" id="cdDays">00</span><span class="cd-label">Days</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cdHours">00</span><span class="cd-label">Hours</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cdMinutes">00</span><span class="cd-label">Minutes</span></div>
+        <div class="cd-unit"><span class="cd-num" id="cdSeconds">00</span><span class="cd-label">Seconds</span></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="script.js"></script>
+</body>
+</html>
