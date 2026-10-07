@@ -6,7 +6,7 @@
 <title>Arvin &amp; Precious</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Lora:wght@600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -25,6 +25,21 @@
 <audio id="bgMusic" loop preload="auto">
   <source src="assets/bgm.mp3" type="audio/mpeg">
 </audio>
+
+<nav class="side-nav" id="sideNav" aria-label="Jump to a section">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs><filter id="navGoo"><feGaussianBlur in="SourceGraphic" stdDeviation="3" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs>
+  </svg>
+  <div class="nav-rail">
+    <ul class="nav-list">
+      <li><a class="nav-item" href="#countdown"><span class="nav-label">Countdown</span></a></li>
+      <li><a class="nav-item" href="#story"><span class="nav-label">Our Love Story</span></a></li>
+      <li><a class="nav-item" href="#gallery"><span class="nav-label">Gallery</span></a></li>
+      <li><a class="nav-item" href="#entourage"><span class="nav-label">Wedding Entourage</span></a></li>
+    </ul>
+    <div class="nav-goo" aria-hidden="true"></div>
+  </div>
+</nav>
 
 <main class="stage" id="stage">
   <p class="invite-heading">You&rsquo;re Invited</p>
@@ -52,6 +67,40 @@
     </div>
   </section>
 </main>
+
+<section class="story" id="story">
+  <div class="story-top">
+    <img class="story-flower" src="assets/photos/story/photo-flower.png" width="781" height="365" alt="Arvin and Precious" loading="lazy">
+    <img class="story-text" src="assets/photos/story/lovestory.png" width="1046" height="699" alt="Our love story: how we met, our proposal story, and how our journey continues. Our gallery." loading="lazy">
+  </div>
+  <img class="story-collage" id="gallery" src="assets/photos/story/collage.png" width="1192" height="1731" alt="Gallery of photos of Arvin and Precious" loading="lazy">
+</section>
+
+
+<section class="ent" id="entourage">
+  <img class="ent-piece title" src="assets/photos/weddingdeets/entourage.png" width="876" height="268" alt="Wedding Entourage" loading="lazy">
+  <img class="ent-piece pp" src="assets/photos/weddingdeets/parents-principal.png" width="836" height="179" alt="Parents of the Groom, Parents of the Bride, Principal Sponsors" loading="lazy">
+  <img class="ent-piece bm" src="assets/photos/weddingdeets/assist-best-maid.png" width="805" height="103" alt="To assist us in our needs: Best Man, Maid of Honor" loading="lazy">
+  <img class="ent-piece cv" src="assets/photos/weddingdeets/secondary-candle-veil.png" width="683" height="146" alt="Secondary Sponsors: Candle, Veil" loading="lazy">
+  <img class="ent-piece bb" src="assets/photos/weddingdeets/bind-bride.png" width="709" height="304" alt="Cord, Groomsmen, Bridesmaids" loading="lazy">
+  <img class="ent-piece bf" src="assets/photos/weddingdeets/bible-flower.png" width="697" height="263" alt="Bible Bearer, Coin Bearer, Ring Bearer, Flower Girls" loading="lazy">
+  <div class="ent-names" data-ent="parentsGroom"></div>
+  <div class="ent-names" data-ent="parentsBride"></div>
+  <div class="ent-names" data-ent="principalLeft"></div>
+  <div class="ent-names" data-ent="principalRight"></div>
+  <div class="ent-names" data-ent="bestMan"></div>
+  <div class="ent-names" data-ent="maid"></div>
+  <div class="ent-names" data-ent="candle"></div>
+  <div class="ent-names" data-ent="veil"></div>
+  <div class="ent-names" data-ent="cord"></div>
+  <div class="ent-names" data-ent="groomsmen"></div>
+  <div class="ent-names" data-ent="bridesmaids"></div>
+  <div class="ent-names" data-ent="bible"></div>
+  <div class="ent-names" data-ent="coin"></div>
+  <div class="ent-names" data-ent="ring"></div>
+  <div class="ent-names" data-ent="flower"></div>
+  <p class="ent-status" id="entStatus" hidden></p>
+</section>
 
 <script src="script.js"></script>
 </body>
