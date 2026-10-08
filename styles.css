@@ -238,9 +238,16 @@ button{ font-family: inherit; cursor: pointer; }
 .rsvp-reveal.is-open .rsvp-reveal-inner{ visibility: visible; transition-delay: 0s; }
 .rsvp-rule-label{ display: flex; align-items: center; gap: 12px; margin: 26px 0 12px; font-size: clamp(11px, calc(var(--cq) * 3), 13px); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--rv-ink); }
 .rsvp-rule-label::before, .rsvp-rule-label::after{ content: ""; flex: 1; border-top: 1px dashed var(--rv-line); }
-.rsvp-person{ display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 16px 18px; background: #f4f7fc; border: 1px solid #e1e9f5; border-radius: 14px; }
-.rsvp-person-name{ flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; font: italic 600 clamp(20px, calc(var(--cq) * 6), 26px)/1.25 'Lora', serif; color: var(--rv-ink); }
-.rsvp-control{ display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex: none; margin-left: auto; }
+.rsvp-person{ display: flex; flex-wrap: wrap; align-items: center; gap: 14px 14px; padding: 16px 18px; background: #f4f7fc; border: 1px solid #e1e9f5; border-radius: 14px; }
+.rsvp-person-name{ flex: 1 1 140px; min-width: 0; overflow-wrap: break-word; font: italic 600 clamp(20px, calc(var(--cq) * 6), 26px)/1.25 'Lora', serif; color: var(--rv-ink); }
+.rsvp-title{
+  flex: none; min-width: 84px; padding: 9px 30px 9px 12px; border: 1px solid #c9d6ea; border-radius: 10px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2300357a' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 11px center;
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  font: 600 15px 'Lora', serif; color: var(--rv-ink);
+}
+.rsvp-title:focus{ outline: none; border-color: var(--rv-ink); box-shadow: 0 0 0 3px rgba(0,53,122,.16); }
+.rsvp-control{ display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; flex: 1 0 100%; padding-top: 12px; border-top: 1px dashed var(--rv-line); }
 .rsvp-switch{ position: relative; width: 46px; height: 26px; flex: none; }
 .rsvp-switch input{ position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 48px; height: 44px; margin: 0; opacity: 0; cursor: pointer; }
 .rsvp-switch .track{ position: absolute; inset: 0; border-radius: 999px; background: var(--rv-decline); transition: background .25s var(--ease); }
@@ -250,11 +257,6 @@ button{ font-family: inherit; cursor: pointer; }
 .rsvp-switch-label{ white-space: nowrap; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--rv-decline); }
 .rsvp-switch-label.is-accept{ color: var(--rv-accept); }
 .rsvp-confirm{ padding-top: 24px; }
-@container (max-width: 360px){
-  .rsvp-person{ flex-wrap: wrap; }
-  .rsvp-person-name{ flex-basis: 100%; }
-  .rsvp-control{ flex-direction: row; align-items: center; gap: 12px; margin-left: 0; }
-}
 .rsvp-btn{
   display: block; width: 100%; padding: 16px 18px; border: 0; border-radius: 10px;
   background: linear-gradient(180deg, #0a4aa3, var(--rv-ink)); color: #fff; box-shadow: 0 12px 22px -12px rgba(0,53,122,.7);

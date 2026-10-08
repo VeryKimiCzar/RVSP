@@ -1,5 +1,5 @@
 // One Apps Script web app serves the entourage names and the RSVP guest search/submit; change the URL here only
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw39epnk-qfOVKuoDhtSQCsNek5_78Z-Qec0QCRSFvwL1Yq4fayL7suLlQZ22V1aw5aGQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz59pMXD9cqIjF9yd7sP9jCMEO5pT6Kimbm-l9ZoNxyuq-w6Xh770yJ9THV1XK-iUZgSg/exec";
 
 const stage = document.getElementById("stage");
 const musicDisc = document.getElementById("musicDisc");
@@ -268,7 +268,7 @@ musicDisc.addEventListener("click", () => {
   const nameInput = $("nameInput"), lookupStatus = $("lookupStatus");
   const inviteSection = $("inviteSection"), confirmSection = $("confirmSection");
   const inviteName = $("inviteName"), attendToggle = $("attendToggle"), attendLabel = $("attendLabel");
-  const confirmBtn = $("confirmBtn"), confirmStatus = $("confirmStatus");
+  const confirmBtn = $("confirmBtn"), confirmStatus = $("confirmStatus"), titleSelect = $("titleSelect");
   const overlay = $("thankYouOverlay"), thankYouMessage = $("thankYouMessage"), closeBtn = $("closeThankYouBtn");
 
   let currentGuest = null, debounceTimer, lookupRequestId = 0;
@@ -298,9 +298,9 @@ musicDisc.addEventListener("click", () => {
     }
   }
 
-  async function submitRSVP(guest, status) {
+  async function submitRSVP(guest, status, title) {
     try {
-      const data = await api({ action: "rsvp", id: guest.id, name: guest.name, status: status });
+      const data = await api({ action: "rsvp", id: guest.id, name: guest.name, status: status, title: title });
       if (data.ok) guest.status = status;
       return data;
     } catch (err) {
@@ -358,6 +358,7 @@ musicDisc.addEventListener("click", () => {
     } else if (match) {
       setStatus(lookupStatus, "Invitation found \u2014 welcome, " + titleCase(match.name) + ".");
       inviteName.textContent = match.name;
+      titleSelect.value = ""; // each guest picks their own title
       attendToggle.checked = match.status === "Attending";
       setAttendLabel();
       setReveal(inviteSection, true);
@@ -388,12 +389,18 @@ musicDisc.addEventListener("click", () => {
 
   confirmBtn.addEventListener("click", async () => {
     if (!currentGuest) return;
+    const title = titleSelect.value;
+    if (!title) {
+      setStatus(confirmStatus, "Please choose Mr., Mrs., or Miss before confirming.", true);
+      titleSelect.focus();
+      return;
+    }
     confirmBtn.disabled = true;
     confirmBtn.textContent = "Sending\u2026";
     setStatus(confirmStatus, "");
 
     const accepted = attendToggle.checked;
-    const result = await submitRSVP(currentGuest, accepted ? "Attending" : "Declined");
+    const result = await submitRSVP(currentGuest, accepted ? "Attending" : "Declined", title);
 
     confirmBtn.disabled = false;
     confirmBtn.textContent = "Confirm response";
