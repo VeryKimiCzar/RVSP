@@ -1,5 +1,5 @@
 // One Apps Script web app serves the entourage names and the RSVP guest search/submit; change the URL here only
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz59pMXD9cqIjF9yd7sP9jCMEO5pT6Kimbm-l9ZoNxyuq-w6Xh770yJ9THV1XK-iUZgSg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw39epnk-qfOVKuoDhtSQCsNek5_78Z-Qec0QCRSFvwL1Yq4fayL7suLlQZ22V1aw5aGQ/exec";
 
 const stage = document.getElementById("stage");
 const musicDisc = document.getElementById("musicDisc");
@@ -230,6 +230,14 @@ musicDisc.addEventListener("click", () => {
     ticking = true;
     requestAnimationFrame(function () { ticking = false; setActive(current()); });
   }, { passive: true });
+
+  // Show the nav while the page is scrolling, hide it again shortly after it stops
+  let scrollHideT;
+  document.addEventListener("scroll", function () {
+    nav.classList.add("is-scrolling");
+    clearTimeout(scrollHideT);
+    scrollHideT = setTimeout(function () { nav.classList.remove("is-scrolling"); }, 1400);
+  }, { passive: true, capture: true });
 
   // Hover devices see labels on hover. On touch, the first tap only reveals the labels; the next tap navigates.
   function setOpen(open) { nav.classList.toggle("is-open", open); }

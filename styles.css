@@ -111,15 +111,15 @@ button{ font-family: inherit; cursor: pointer; }
   container-type: inline-size; overflow: clip; background: #0b1f66;
 }
 .story-top{
-  position: relative; --gallery-band: calc(var(--cq) * 8); padding-top: calc(var(--cq) * 5.8);
+  position: relative; --gallery-band: calc(var(--cq) * 8); --gallery-band-shift: calc(var(--cq) * .8); padding-top: calc(var(--cq) * 5.8);
   background: url('assets/photos/story/background3.png') center top / cover no-repeat, #1c2a4a;
 }
 .story-flower, .story-text, .story-collage{ display: block; width: 100%; height: auto; }
-.story-text{ position: relative; z-index: 1; margin-top: calc(var(--cq) * 2); transform: scale(0.97); } /* gap under the couple photo; the title already has its own top space inside the image */
+.story-text{ position: relative; z-index: 1; margin-top: calc(var(--cq) * 2); } /* gap under the couple photo; the title already has its own top space inside the image */
 #gallery{ scroll-margin-top: calc(var(--cq) * 10); } /* keeps the "Our Gallery" title in view when jumped to */
 /* lovestory.png is transparent behind "Our Gallery", so the band is drawn here, behind it */
 .story-top::after{
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: var(--gallery-band);
+  content: ""; position: absolute; left: 0; right: 0; bottom: var(--gallery-band-shift); height: var(--gallery-band);
   background: linear-gradient(90deg, #060a33 28%, #081c5f 80%);
 }
 
@@ -361,4 +361,15 @@ body.site-opened .side-nav{ opacity: 1; visibility: visible; transition: opacity
   .music-disc .disc-art, .music-hint{ animation: none; }
   .envelope-wrap, .invite-heading, .invite-date, .countdown, .cd-story{ transition-duration: .01s; }
   .stage.is-opened .cd-flap, .stage.is-opened .cd-content{ animation-duration: .01s; animation-delay: 0s; }
+}
+
+/* Side nav: invisible when the page is idle, visible while scrolling (and on hover, focus, or after a tap on it) */
+body.site-opened .side-nav{ opacity: 0; transition: opacity .35s var(--ease); }
+body.site-opened .side-nav.is-scrolling,
+body.site-opened .side-nav.is-open,
+body.site-opened .side-nav:hover,
+body.site-opened .side-nav:focus-within{ opacity: 1; }
+/* On touch screens an invisible nav must not catch taps meant for the text underneath */
+@media (hover: none){
+  body.site-opened .side-nav:not(.is-scrolling):not(.is-open){ pointer-events: none; }
 }
