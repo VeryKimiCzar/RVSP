@@ -14,17 +14,45 @@ const cdParts = {};
 const setAll = (els, v) => els.forEach((el) => { el.textContent = v; });
 const pad = (n) => String(n).padStart(2, "0");
 
-// Opened state survives a reload; storage access is guarded so a blocked browser can't stop the script
+// The opened envelope is remembered only for a refresh (or back/forward) in this tab, with the scroll position, so a reload
+// returns to the same spot. Opening the site fresh (new tab, typed or shared link) starts at the envelope again.
+// Storage access is guarded so a blocked browser can't stop the script.
 const STORAGE_KEY = "rvsp-envelope-opened";
+const SCROLL_KEY = "rvsp-scroll-y";
 const storage = {
-  get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
-  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+  get: (k) => { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { sessionStorage.setItem(k, v); } catch (e) {} },
+  remove: (k) => { try { sessionStorage.removeItem(k); } catch (e) {} },
 };
-if (storage.get(STORAGE_KEY) === "true") {
+try { localStorage.removeItem(STORAGE_KEY); } catch (e) {} // earlier versions remembered it forever
+function navigationType() {
+  const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+  if (nav && nav.type) return nav.type;
+  const legacy = performance.navigation && performance.navigation.type; // 1 = reload, 2 = back/forward
+  return legacy === 1 ? "reload" : legacy === 2 ? "back_forward" : "navigate";
+}
+const keepPlace = navigationType() === "reload" || navigationType() === "back_forward";
+if (!keepPlace) { storage.remove(STORAGE_KEY); storage.remove(SCROLL_KEY); }
+if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+if (keepPlace && storage.get(STORAGE_KEY) === "true") {
   stage.classList.add("is-opened");
   document.body.classList.add("site-opened");
   countdown.setAttribute("aria-hidden", "false");
+  const savedY = Number(storage.get(SCROLL_KEY)) || 0;
+  if (savedY > 0) {
+    requestAnimationFrame(() => window.scrollTo(0, savedY));
+    window.addEventListener("load", () => { if (Math.abs(window.scrollY - savedY) > 2) window.scrollTo(0, savedY); }, { once: true });
+  }
 }
+let scrollSaveQueued = false;
+function saveScroll() {
+  scrollSaveQueued = false;
+  if (document.body.classList.contains("site-opened")) storage.set(SCROLL_KEY, String(Math.round(window.scrollY)));
+}
+window.addEventListener("scroll", () => {
+  if (!scrollSaveQueued) { scrollSaveQueued = true; requestAnimationFrame(saveScroll); }
+}, { passive: true });
+window.addEventListener("pagehide", saveScroll);
 
 // Every request to the Apps Script gives up after 12s, so "Searching..." can never hang forever
 const FETCH_TIMEOUT_MS = 12000;
@@ -57,7 +85,8 @@ document.getElementById("openBtn").addEventListener("click", () => {
 });
 
 // "Click to see our story" (the scroll in the countdown scene): smooth-scroll down to the Love Story section
-document.getElementById("storyLink").addEventListener("click", (e) => {
+const storyLink = document.getElementById("storyLink");
+if (storyLink) storyLink.addEventListener("click", (e) => {
   e.preventDefault();
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.getElementById("story").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
@@ -234,6 +263,7 @@ musicDisc.addEventListener("click", () => {
   const MIN_SEARCH_LENGTH = 4;
   const $ = (id) => document.getElementById(id);
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  if (!document.getElementById("rsvpPanel")) return;
   const openBtn = $("rsvpOpen"), panel = $("rsvpPanel"), panelInner = panel.querySelector(".rsvp-panel-inner");
   const nameInput = $("nameInput"), lookupStatus = $("lookupStatus");
   const inviteSection = $("inviteSection"), confirmSection = $("confirmSection");
