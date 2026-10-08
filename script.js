@@ -1,3 +1,6 @@
+// One Apps Script web app serves the entourage names and the RSVP guest search/submit; change the URL here only
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw39epnk-qfOVKuoDhtSQCsNek5_78Z-Qec0QCRSFvwL1Yq4fayL7suLlQZ22V1aw5aGQ/exec";
+
 const stage = document.getElementById("stage");
 const musicDisc = document.getElementById("musicDisc");
 const musicHint = document.getElementById("musicHint");
@@ -5,12 +8,10 @@ const bgMusic = document.getElementById("bgMusic");
 const countdown = document.getElementById("countdown");
 
 const WEDDING = new Date("2026-12-08T00:00:00+08:00").getTime();
-const cdParts = {
-  d: document.getElementById("cdDays"),
-  h: document.getElementById("cdHours"),
-  m: document.getElementById("cdMinutes"),
-  s: document.getElementById("cdSeconds"),
-};
+// every element tagged data-cd="d|h|m|s" (the countdown scene and the Details section) is updated together
+const cdParts = {};
+["d", "h", "m", "s"].forEach((k) => { cdParts[k] = document.querySelectorAll('[data-cd="' + k + '"]'); });
+const setAll = (els, v) => els.forEach((el) => { el.textContent = v; });
 const pad = (n) => String(n).padStart(2, "0");
 
 // Opened state survives a reload; storage access is guarded so a blocked browser can't stop the script
@@ -21,24 +22,45 @@ const storage = {
 };
 if (storage.get(STORAGE_KEY) === "true") {
   stage.classList.add("is-opened");
+  document.body.classList.add("site-opened");
   countdown.setAttribute("aria-hidden", "false");
+}
+
+// Every request to the Apps Script gives up after 12s, so "Searching..." can never hang forever
+const FETCH_TIMEOUT_MS = 12000;
+async function fetchJSON(url) {
+  const ctrl = typeof AbortController === "function" ? new AbortController() : null;
+  const timer = setTimeout(() => { if (ctrl) ctrl.abort(); }, FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function tickCountdown() {
   const total = Math.max(0, Math.floor((WEDDING - Date.now()) / 1000));
-  cdParts.d.textContent = pad(Math.floor(total / 86400));
-  cdParts.h.textContent = pad(Math.floor((total % 86400) / 3600));
-  cdParts.m.textContent = pad(Math.floor((total % 3600) / 60));
-  cdParts.s.textContent = pad(total % 60);
+  setAll(cdParts.d, pad(Math.floor(total / 86400)));
+  setAll(cdParts.h, pad(Math.floor((total % 86400) / 3600)));
+  setAll(cdParts.m, pad(Math.floor((total % 3600) / 60)));
+  setAll(cdParts.s, pad(total % 60));
 }
 tickCountdown();
 setInterval(tickCountdown, 1000);
 
 document.getElementById("openBtn").addEventListener("click", () => {
   stage.classList.add("is-opened");
+  document.body.classList.add("site-opened");
   countdown.setAttribute("aria-hidden", "false");
-  document.dispatchEvent(new CustomEvent("invitation:open"));
   storage.set(STORAGE_KEY, "true");
+});
+
+// "Click to see our story" (the scroll in the countdown scene): smooth-scroll down to the Love Story section
+document.getElementById("storyLink").addEventListener("click", (e) => {
+  e.preventDefault();
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("story").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
 });
 
 musicDisc.addEventListener("click", () => {
@@ -59,10 +81,11 @@ musicDisc.addEventListener("click", () => {
 // Entourage names come from the "Entourage" tab through the same Apps Script web app as the old site.
 // Expected reply: { ok: true, entourage: [ { role: "best man", name: "..." }, ... ] }
 (function () {
-  const ENTOURAGE_API_URL = "https://script.google.com/macros/s/AKfycbxr_RAl4cYYbmkKhBMQ0jTdFhAfkopi_kwzyDHOElHUGZOJITwMgDCyOE6DRMRv3LCu4w/exec";
+  const ENTOURAGE_API_URL = APPS_SCRIPT_URL;
 
+  // Roles in the sheet are matched without case, extra spaces, punctuation or the word "the" ("Parents of the Groom" = "parents of groom")
   const ROLE_TO_BLOCK = {
-    "parents of the groom": "parentsGroom", "parents of the bride": "parentsBride",
+    "parents of groom": "parentsGroom", "parents of bride": "parentsBride", "grooms parents": "parentsGroom", "brides parents": "parentsBride",
     "primary principal": "principal", "principal sponsor": "principal", "principal sponsors": "principal", "principal": "principal",
     "best man": "bestMan", "maid of honor": "maid", "maid of honour": "maid",
     "candle": "candle", "veil": "veil", "cord": "cord",
@@ -86,7 +109,7 @@ musicDisc.addEventListener("click", () => {
   function render(entries) {
     const groups = {};
     entries.forEach(function (e) {
-      const block = ROLE_TO_BLOCK[String(e.role || "").toLowerCase().replace(/\s+/g, " ").trim()];
+      const block = ROLE_TO_BLOCK[String(e.role || "").toLowerCase().replace(/[\u2019'`.]/g, "").replace(/\bthe\b/g, " ").replace(/\s+/g, " ").trim()];
       const name = String(e.name || "").trim();
       if (!block || !name) return;
       (groups[block] = groups[block] || []).push(name);
@@ -107,7 +130,7 @@ musicDisc.addEventListener("click", () => {
 
   async function load() {
     try {
-      const data = await (await fetch(ENTOURAGE_API_URL + "?action=entourage")).json();
+      const data = await fetchJSON(ENTOURAGE_API_URL + "?action=entourage");
       if (!data.ok) throw new Error("not ok");
       render(data.entourage || []);
     } catch (err) {
@@ -204,4 +227,174 @@ musicDisc.addEventListener("click", () => {
 
   setActive(current());
   requestAnimationFrame(function () { requestAnimationFrame(function () { ready = true; }); });
+})();
+
+// RSVP: find your name (?action=search), flip attending or declined, confirm (?action=rsvp), thank-you popup.
+(function () {
+  const MIN_SEARCH_LENGTH = 4;
+  const $ = (id) => document.getElementById(id);
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const openBtn = $("rsvpOpen"), panel = $("rsvpPanel"), panelInner = panel.querySelector(".rsvp-panel-inner");
+  const nameInput = $("nameInput"), lookupStatus = $("lookupStatus");
+  const inviteSection = $("inviteSection"), confirmSection = $("confirmSection");
+  const inviteName = $("inviteName"), attendToggle = $("attendToggle"), attendLabel = $("attendLabel");
+  const confirmBtn = $("confirmBtn"), confirmStatus = $("confirmStatus");
+  const overlay = $("thankYouOverlay"), thankYouMessage = $("thankYouMessage"), closeBtn = $("closeThankYouBtn");
+
+  let currentGuest = null, debounceTimer, lookupRequestId = 0;
+
+  const titleCase = (s) => s.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+
+  function setStatus(el, text, isError) {
+    el.classList.toggle("is-error", !!isError);
+    el.textContent = "";
+    if (!text) return;
+    const dot = document.createElement("span");
+    dot.className = "dot";
+    el.append(dot, " " + text);
+  }
+
+  async function api(params) {
+    const query = Object.keys(params).map((k) => k + "=" + encodeURIComponent(params[k])).join("&");
+    return fetchJSON(APPS_SCRIPT_URL + "?" + query);
+  }
+
+  async function findGuest(query) {
+    try {
+      const data = await api({ action: "search", q: query });
+      return data.ok ? { match: data.match, error: false } : { match: null, error: true };
+    } catch (err) {
+      return { match: null, error: true };
+    }
+  }
+
+  async function submitRSVP(guest, status) {
+    try {
+      const data = await api({ action: "rsvp", id: guest.id, name: guest.name, status: status });
+      if (data.ok) guest.status = status;
+      return data;
+    } catch (err) {
+      return { ok: false, error: "connection" };
+    }
+  }
+
+  // Closed parts are inert so their fields can't be reached with Tab or a screen reader
+  function setReveal(section, open) {
+    section.classList.toggle("is-open", open);
+    section.firstElementChild.toggleAttribute("inert", !open);
+  }
+  function closeReveals() { setReveal(inviteSection, false); setReveal(confirmSection, false); }
+
+  function setPanel(open) {
+    panel.classList.toggle("is-open", open);
+    panelInner.toggleAttribute("inert", !open);
+    openBtn.setAttribute("aria-expanded", String(open));
+  }
+
+  openBtn.addEventListener("click", () => {
+    const opening = !panel.classList.contains("is-open");
+    setPanel(opening);
+    if (opening) {
+      setTimeout(() => {
+        panel.scrollIntoView({ behavior: reduce.matches ? "auto" : "smooth", block: "start" });
+        nameInput.focus({ preventScroll: true });
+      }, 350);
+    }
+  });
+
+  // Under 4 characters, search only once the guest has started a second word, or on Enter
+  function meetsSearchThreshold(value) {
+    return value.length >= MIN_SEARCH_LENGTH || /\s/.test(value);
+  }
+
+  async function handleLookup(value, force) {
+    const trimmed = value.trim();
+    const requestId = ++lookupRequestId;
+
+    if (!trimmed || (!force && !meetsSearchThreshold(trimmed))) {
+      setStatus(lookupStatus, "");
+      closeReveals();
+      return;
+    }
+
+    setStatus(lookupStatus, "Searching\u2026");
+    const { match, error } = await findGuest(trimmed);
+    if (requestId !== lookupRequestId) return; // a newer search has started
+    currentGuest = match;
+
+    if (error) {
+      setStatus(lookupStatus, "We couldn\u2019t connect to the server. Please try again in a moment.", true);
+      closeReveals();
+    } else if (match) {
+      setStatus(lookupStatus, "Invitation found \u2014 welcome, " + titleCase(match.name) + ".");
+      inviteName.textContent = match.name;
+      attendToggle.checked = match.status === "Attending";
+      setAttendLabel();
+      setReveal(inviteSection, true);
+      setReveal(confirmSection, true);
+    } else {
+      setStatus(lookupStatus, "We couldn\u2019t find that name. Please check the spelling or contact us directly.", true);
+      closeReveals();
+    }
+  }
+
+  nameInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => handleLookup(nameInput.value, false), 350);
+  });
+  nameInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    clearTimeout(debounceTimer);
+    handleLookup(nameInput.value, true);
+  });
+
+  function setAttendLabel() {
+    const on = attendToggle.checked;
+    attendLabel.textContent = on ? "Joyfully accepts" : "Regretfully declines";
+    attendLabel.classList.toggle("is-accept", on);
+  }
+  attendToggle.addEventListener("change", setAttendLabel);
+
+  confirmBtn.addEventListener("click", async () => {
+    if (!currentGuest) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Sending\u2026";
+    setStatus(confirmStatus, "");
+
+    const accepted = attendToggle.checked;
+    const result = await submitRSVP(currentGuest, accepted ? "Attending" : "Declined");
+
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = "Confirm response";
+
+    if (!result.ok) {
+      setStatus(confirmStatus, "We couldn\u2019t reach the server. Please try again in a moment.", true);
+      return;
+    }
+    showThankYou(accepted);
+  });
+
+  function showThankYou(accepted) {
+    const sentiment = accepted ? "We can\u2019t wait to celebrate with you!" : "We\u2019ll miss you, but thank you for letting us know.";
+    thankYouMessage.textContent = "Your response has been received. " + sentiment;
+    overlay.classList.add("is-open");
+    overlay.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden"; // the body is the page's scroller
+    closeBtn.focus();
+  }
+
+  function closeThankYou() {
+    overlay.classList.remove("is-open");
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+    confirmBtn.focus({ preventScroll: true });
+  }
+  closeBtn.addEventListener("click", closeThankYou);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeThankYou(); });
+  document.addEventListener("keydown", (e) => {
+    if (!overlay.classList.contains("is-open")) return;
+    if (e.key === "Escape") closeThankYou();
+    else if (e.key === "Tab") { e.preventDefault(); closeBtn.focus(); } // one button: keep focus inside the popup
+  });
 })();
