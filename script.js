@@ -1,5 +1,5 @@
 // One Apps Script web app serves the entourage names and the RSVP guest search/submit; change the URL here only
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw39epnk-qfOVKuoDhtSQCsNek5_78Z-Qec0QCRSFvwL1Yq4fayL7suLlQZ22V1aw5aGQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz59pMXD9cqIjF9yd7sP9jCMEO5pT6Kimbm-l9ZoNxyuq-w6Xh770yJ9THV1XK-iUZgSg/exec";
 
 const stage = document.getElementById("stage");
 const musicDisc = document.getElementById("musicDisc");
